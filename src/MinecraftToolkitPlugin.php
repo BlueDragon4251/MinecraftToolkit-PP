@@ -44,6 +44,33 @@ class MinecraftToolkitPlugin implements HasPluginSettings, Plugin
             Toggle::make('backup_before_overwrite')
                 ->label('Vor dem Überschreiben Sicherung erstellen')
                 ->default((bool) config('minecrafttoolkit.backup_before_overwrite', true)),
+            Toggle::make('modrinth_enabled')
+                ->label('Modrinth aktivieren')
+                ->default((bool) config('minecrafttoolkit.modrinth_enabled', true)),
+            Toggle::make('curseforge_enabled')
+                ->label('CurseForge aktivieren')
+                ->default((bool) config('minecrafttoolkit.curseforge_enabled', false)),
+            TextInput::make('curseforge_api_key')
+                ->label('CurseForge API-Key')
+                ->password()
+                ->revealable()
+                ->default((string) config('minecrafttoolkit.curseforge_api_key', ''))
+                ->helperText('Erforderlich für Suche, Downloads und Dependencies über CurseForge.'),
+            Toggle::make('updater_enabled')
+                ->label('Paket-Updater aktivieren')
+                ->default((bool) config('minecrafttoolkit.updater_enabled', true)),
+            Toggle::make('version_change_enabled')
+                ->label('Minecraft-Versionswechsel aktivieren')
+                ->default((bool) config('minecrafttoolkit.version_change_enabled', true)),
+            Toggle::make('version_change_users_enabled')
+                ->label('Serverbesitzern Versionswechsel erlauben')
+                ->default((bool) config('minecrafttoolkit.version_change_users_enabled', true)),
+            Toggle::make('crossplay_enabled')
+                ->label('Crossplay für Paper und Purpur aktivieren')
+                ->default((bool) config('minecrafttoolkit.crossplay_enabled', true)),
+            Toggle::make('bedrock_port_required')
+                ->label('Zusätzlichen Bedrock-Port verlangen')
+                ->default((bool) config('minecrafttoolkit.bedrock_port_required', true)),
             TextInput::make('http_timeout')
                 ->label('API-Timeout in Sekunden')
                 ->numeric()
@@ -65,6 +92,14 @@ class MinecraftToolkitPlugin implements HasPluginSettings, Plugin
             'MINECRAFT_TOOLKIT_ENABLED' => (bool) ($data['enabled'] ?? false),
             'MINECRAFT_TOOLKIT_ADMINS_ONLY' => (bool) ($data['admins_only'] ?? false),
             'MINECRAFT_TOOLKIT_BACKUP_BEFORE_OVERWRITE' => (bool) ($data['backup_before_overwrite'] ?? true),
+            'MINECRAFT_TOOLKIT_MODRINTH_ENABLED' => (bool) ($data['modrinth_enabled'] ?? true),
+            'MINECRAFT_TOOLKIT_CURSEFORGE_ENABLED' => (bool) ($data['curseforge_enabled'] ?? false),
+            'MINECRAFT_TOOLKIT_CURSEFORGE_API_KEY' => trim((string) ($data['curseforge_api_key'] ?? '')),
+            'MINECRAFT_TOOLKIT_UPDATER_ENABLED' => (bool) ($data['updater_enabled'] ?? true),
+            'MINECRAFT_TOOLKIT_VERSION_CHANGE_ENABLED' => (bool) ($data['version_change_enabled'] ?? true),
+            'MINECRAFT_TOOLKIT_VERSION_CHANGE_USERS_ENABLED' => (bool) ($data['version_change_users_enabled'] ?? true),
+            'MINECRAFT_TOOLKIT_CROSSPLAY_ENABLED' => (bool) ($data['crossplay_enabled'] ?? true),
+            'MINECRAFT_TOOLKIT_BEDROCK_PORT_REQUIRED' => (bool) ($data['bedrock_port_required'] ?? true),
             'MINECRAFT_TOOLKIT_HTTP_TIMEOUT' => max(5, (int) ($data['http_timeout'] ?? 20)),
             'MINECRAFT_TOOLKIT_DOWNLOAD_TIMEOUT' => max(30, (int) ($data['download_timeout'] ?? 300)),
         ]);
