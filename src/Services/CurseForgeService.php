@@ -12,7 +12,11 @@ use Illuminate\Support\Facades\Log;
 
 class CurseForgeService
 {
+    public function __construct(private readonly CurseForgeApiKeyProvider $apiKeyProvider) {}
+
     private const API = 'https://api.curseforge.com/v1';
+
+    private const PROXY_HEADER = 'X-Minecraft-Toolkit-Proxy-Secret';
 
     private const MINECRAFT_GAME_ID = 432;
 
@@ -272,18 +276,22 @@ class CurseForgeService
     private function get(string $path, array $query = []): array
     {
         try {
-            return Http::acceptJson()
-                ->withHeaders(['x-api-key' => $this->apiKey()])
-                ->withUserAgent((string) config('minecrafttoolkit.user_agent'))
-                ->connectTimeout(5)
-                ->timeout((int) config('minecrafttoolkit.http_timeout', 20))
-                ->get(self::API . $path, $query)
-                ->throw()
-                ->json();
+            $response = $this->usesProxy()
+                ? $this->proxyRequest($path, $query)
+                : $this->directRequest($path, $query);
+
+            if (!is_array($response)) {
+                throw new MinecraftToolkitException('CurseForge hat eine ungültige Antwort geliefert.');
+            }
+
+            return $response;
+        } catch (MinecraftToolkitException $exception) {
+            throw $exception;
         } catch (\Throwable $exception) {
             Log::warning('Minecraft Toolkit CurseForge request failed.', [
                 'exception' => $exception::class,
                 'path' => $path,
+                'mode' => $this->usesProxy() ? 'proxy' : 'direct',
             ]);
             throw new MinecraftToolkitException(
                 'CurseForge ist derzeit nicht erreichbar. Versuche es später erneut.',
@@ -292,24 +300,91 @@ class CurseForgeService
         }
     }
 
+    /** @param array<string, scalar> $query
+     *  @return array<string, mixed>
+     */
+    private function proxyRequest(string $path, array $query = []): array
+    {
+        $headers = [];
+        $secret = trim((string) config('minecrafttoolkit.curseforge_proxy_secret', ''));
+        if ($secret !== '') {
+            $headers[self::PROXY_HEADER] = $secret;
+        }
+
+        return Http::acceptJson()
+            ->withHeaders($headers)
+            ->withUserAgent((string) config('minecrafttoolkit.user_agent'))
+            ->connectTimeout(5)
+            ->timeout((int) config('minecrafttoolkit.http_timeout', 20))
+            ->get($this->proxyUrl(), ['path' => $path] + $query)
+            ->throw()
+            ->json();
+    }
+
+    /** @param array<string, scalar> $query
+     *  @return array<string, mixed>
+     */
+    private function directRequest(string $path, array $query = []): array
+    {
+        return Http::acceptJson()
+            ->withHeaders(['x-api-key' => $this->apiKey()])
+            ->withUserAgent((string) config('minecrafttoolkit.user_agent'))
+            ->connectTimeout(5)
+            ->timeout((int) config('minecrafttoolkit.http_timeout', 20))
+            ->get(self::API . $path, $query)
+            ->throw()
+            ->json();
+    }
+
     private function assertEnabled(): void
     {
-        if (!(bool) config('minecrafttoolkit.curseforge_enabled', false)) {
+        if (!(bool) config('minecrafttoolkit.curseforge_enabled', true)) {
             throw new MinecraftToolkitException('CurseForge ist in den Plugin-Einstellungen deaktiviert.');
         }
-        $this->apiKey();
+
+        if (!$this->usesProxy() && !$this->apiKeyProvider->hasKey()) {
+            throw new MinecraftToolkitException(
+                'CurseForge ist deaktiviert, weil weder ein Toolkit-Proxy noch ein lokaler CurseForge API-Key konfiguriert ist.'
+            );
+        }
+    }
+
+    public function isConfigured(): bool
+    {
+        return (bool) config('minecrafttoolkit.curseforge_enabled', true)
+            && ($this->usesProxy() || $this->apiKeyProvider->hasKey());
+    }
+
+    public function keySource(): ?string
+    {
+        if ($this->usesProxy()) {
+            return 'toolkit-proxy';
+        }
+
+        return $this->apiKeyProvider->source();
     }
 
     private function apiKey(): string
     {
-        $key = trim((string) config('minecrafttoolkit.curseforge_api_key', ''));
-        if ($key === '') {
+        $key = $this->apiKeyProvider->getKey();
+        if ($key === null) {
             throw new MinecraftToolkitException(
-                'CurseForge ist deaktiviert, weil kein API-Key konfiguriert ist.'
+                'CurseForge ist deaktiviert, weil weder ein Toolkit-Proxy noch ein lokaler CurseForge API-Key konfiguriert ist.'
             );
         }
 
         return $key;
+    }
+
+
+    private function usesProxy(): bool
+    {
+        return $this->proxyUrl() !== '';
+    }
+
+    private function proxyUrl(): string
+    {
+        return rtrim(trim((string) config('minecrafttoolkit.curseforge_proxy_url', '')), '/');
     }
 
     /** @param array<string, mixed> $file */

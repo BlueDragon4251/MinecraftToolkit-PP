@@ -2,7 +2,7 @@
     @if (config('minecrafttoolkit.curseforge_enabled') && !$this->curseForgeConfigured())
         <x-filament::section heading="CurseForge ist nicht konfiguriert">
             <p class="text-sm text-gray-600 dark:text-gray-300">
-                CurseForge ist deaktiviert, weil kein API-Key in den Minecraft-Toolkit-Einstellungen gespeichert ist.
+                CurseForge ist deaktiviert, weil dieser Plugin-Build keinen zentralen API-Key enthält und kein lokaler Override gesetzt wurde.
             </p>
         </x-filament::section>
     @endif

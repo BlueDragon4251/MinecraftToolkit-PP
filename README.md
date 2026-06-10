@@ -2,6 +2,14 @@
 
 Minecraft Toolkit is a Pelican Panel plugin for setting up and managing Minecraft servers directly from the server panel. It writes files through Wings, stores the selected software and installed packages per server, and blocks risky changes while the server is running.
 
+## License and usage rights
+
+Minecraft Toolkit is **source-available, not open source**. You may download and use the official plugin on your own Pelican Panel installation, but you may not redistribute it, reupload it, publish forks, publish modified versions, rename it, resell it, or release derivative versions.
+
+Official distribution is only allowed through channels approved by Nico Egger / BlueIT, such as the official GitHub repository and the Pelican Hub. See [`LICENSE`](./LICENSE) for the full terms.
+
+No CurseForge API key is included in the public plugin source. CurseForge access is designed to run through a backend proxy or an optional private local key.
+
 ## Features
 
 - Guided setup for Vanilla Java, Vanilla Bedrock, Paper, Folia, Purpur, Fabric, Forge, and NeoForge
@@ -11,7 +19,7 @@ Minecraft Toolkit is a Pelican Panel plugin for setting up and managing Minecraf
 - Optional validated 64x64 PNG server icon
 - Modrinth plugin installation for Paper, Purpur, and Folia
 - Modrinth mod installation for Fabric, Forge, and NeoForge
-- CurseForge plugin and mod installation with an administrator API key
+- CurseForge plugin and mod installation through a Toolkit backend proxy or optional private local API key
 - Required and optional dependency review
 - Optional Geyser and Floodgate crossplay for Paper and Purpur
 - Update checks for managed Modrinth, Geyser, and Floodgate packages
@@ -83,8 +91,9 @@ Forge and NeoForge use their official `--installServer` flow during the first se
 | Software | Package type | Package directory | Notes |
 | --- | --- | --- | --- |
 | Vanilla Java | none | none | Official Mojang server JAR |
-| Paper | plugins | `/plugins` | Supports Modrinth and crossplay |
-| Purpur | plugins | `/plugins` | Supports Modrinth and crossplay |
+| Paper | plugins | `/plugins` | Supports Modrinth, CurseForge, and crossplay |
+| Purpur | plugins | `/plugins` | Supports Modrinth, CurseForge, and crossplay |
+| Folia | plugins | `/plugins` | Supports plugin installation with Folia compatibility warnings |
 | Fabric | mods | `/mods` | Uses the official Fabric server launcher |
 | Forge | mods | `/mods` | Runs the official installer on first start |
 | NeoForge | mods | `/mods` | Runs the official installer on first start |
@@ -105,7 +114,7 @@ Search results are filtered by the configured Minecraft version, server loader, 
 
 Required dependencies are shown before installation but are not installed silently. Select and install them separately so every additional package remains visible to the user.
 
-CurseForge requires an API key from the CurseForge for Studios developer console. Enable the source and store the key in the Minecraft Toolkit plugin settings. If no key is configured, CurseForge is not shown to server users.
+CurseForge uses the official BlueIT Toolkit backend proxy by default, so normal plugin users do not need to request their own CurseForge API key. The CurseForge API key stays on the BlueIT/Vercel proxy and is not shipped inside the public PHP plugin source. Advanced selfhosters can override the proxy URL or configure a private direct API key. If CurseForge is disabled or no valid proxy/key is available, CurseForge is hidden from server users while Modrinth continues to work.
 
 CurseForge does not consistently expose whether a mod is client-only or server-compatible. The Toolkit shows a warning for ambiguous CurseForge mods and requires the user to verify the project description before installation.
 
@@ -203,8 +212,10 @@ Administrators can configure Minecraft Toolkit from the Pelican plugin settings 
 | `MINECRAFT_TOOLKIT_ADMINS_ONLY` | `false` | Restricts modifying Toolkit actions to administrators |
 | `MINECRAFT_TOOLKIT_BACKUP_BEFORE_OVERWRITE` | `true` | Backs up setup target files before replacement |
 | `MINECRAFT_TOOLKIT_MODRINTH_ENABLED` | `true` | Enables Modrinth search and installation |
-| `MINECRAFT_TOOLKIT_CURSEFORGE_ENABLED` | `false` | Enables CurseForge when an API key is configured |
-| `MINECRAFT_TOOLKIT_CURSEFORGE_API_KEY` | empty | CurseForge API key sent through the `x-api-key` request header |
+| `MINECRAFT_TOOLKIT_CURSEFORGE_ENABLED` | `true` | Enables CurseForge when the default proxy, a custom proxy, or a private key is available |
+| `MINECRAFT_TOOLKIT_CURSEFORGE_PROXY_URL` | `https://blueit42.vercel.app/api/curseforge/proxy` | Toolkit CurseForge proxy used by default for public installs |
+| `MINECRAFT_TOOLKIT_CURSEFORGE_PROXY_SECRET` | `blueit42-minecraft-toolkit-proxy-v1` | Public release token for the default Toolkit proxy; override when using your own proxy |
+| `MINECRAFT_TOOLKIT_CURSEFORGE_API_KEY` | empty | Optional private direct CurseForge API key sent through the `x-api-key` request header |
 | `MINECRAFT_TOOLKIT_UPDATER_ENABLED` | `true` | Enables the package updater page |
 | `MINECRAFT_TOOLKIT_VERSION_CHANGE_ENABLED` | `true` | Enables compatibility checks and Minecraft version changes |
 | `MINECRAFT_TOOLKIT_VERSION_CHANGE_USERS_ENABLED` | `true` | Allows non-admin server owners and permitted subusers to change versions |
@@ -249,7 +260,7 @@ Users without the required permissions do not see the corresponding Toolkit page
 - **Fabric, Forge, or NeoForge setup is denied:** grant startup-update permission or run the setup as the server owner or an administrator.
 - **Forge or NeoForge does not start:** inspect the first-start console, verify the container has the correct Java version, and confirm `/run.sh` was created.
 - **No Modrinth results:** verify the selected Minecraft version and loader are supported by the project and that the Panel host can reach `api.modrinth.com`.
-- **CurseForge is missing:** enable it in plugin settings and configure a valid API key.
+- **CurseForge is missing:** verify that the BlueIT Toolkit proxy is reachable, disable local overrides with wrong values, or configure a private local API key. Public plugin builds do not ship with a CurseForge API key.
 - **CurseForge has no download URL:** the project author disabled third-party API downloads; that file cannot be installed automatically.
 - **Crossplay config is missing:** start Paper/Purpur once, stop it, and apply the config from Minecraft Settings.
 - **Bedrock players cannot connect:** verify the selected allocation permits UDP traffic and the node firewall exposes that port.
@@ -259,3 +270,42 @@ Users without the required permissions do not see the corresponding Toolkit page
 - **Wings is unreachable:** verify node connectivity and credentials; Toolkit file actions intentionally stop instead of writing directly to node volumes.
 
 Logs for setup, installs, crossplay, checks, and updates are stored per server and shown on the Minecraft Overview page.
+
+
+## CurseForge API handling
+
+CurseForge access is designed around a backend proxy. This keeps the CurseForge API key outside the public plugin source and avoids requiring every normal plugin user to apply for a key for the same project.
+
+Public installs work out of the box with the default BlueIT proxy values:
+
+```env
+MINECRAFT_TOOLKIT_CURSEFORGE_PROXY_URL=https://blueit42.vercel.app/api/curseforge/proxy
+MINECRAFT_TOOLKIT_CURSEFORGE_PROXY_SECRET=blueit42-minecraft-toolkit-proxy-v1
+```
+
+Normal users do not need to set these values manually. They are included as defaults in the plugin config.
+
+If you run your own Vercel or backend proxy, set these variables in the plugin and configure the matching secret on your proxy:
+
+```env
+MINECRAFT_TOOLKIT_CURSEFORGE_PROXY_URL=https://your-vercel-domain.vercel.app/api/curseforge/proxy
+MINECRAFT_TOOLKIT_CURSEFORGE_PROXY_SECRET=your_proxy_secret
+```
+
+Your Vercel/backend proxy project must have:
+
+```env
+CURSEFORGE_API_KEY=your_real_curseforge_key
+CURSEFORGE_PROXY_SECRET=your_proxy_secret
+```
+
+The default proxy secret is a public release token, not a private API key. Do not treat it as protection against abuse. Real protection must happen on the proxy side through rate limiting, caching, allowed operations, and monitoring.
+
+Optional private/selfhosted fallback:
+
+```env
+MINECRAFT_TOOLKIT_CURSEFORGE_API_KEY=local_direct_key
+```
+
+Do not ship CurseForge API keys inside public plugin builds. The public plugin contains only the default proxy URL and a public release token. If no proxy and no direct private key are configured, CurseForge disables itself safely and Modrinth continues to work.
+

@@ -311,11 +311,11 @@ class MinecraftInstallerPage extends Page implements HasSchemas
         if ((bool) config('minecrafttoolkit.modrinth_enabled', true)) {
             $options['modrinth'] = 'Modrinth';
         }
-        if ((bool) config('minecrafttoolkit.curseforge_enabled', false)
+        if ((bool) config('minecrafttoolkit.curseforge_enabled', true)
         ) {
             $options['curseforge'] = $this->curseForgeConfigured()
                 ? 'CurseForge'
-                : 'CurseForge (API-Key fehlt)';
+                : 'CurseForge (Proxy/API-Key fehlt)';
         }
 
         return $options;
@@ -328,7 +328,7 @@ class MinecraftInstallerPage extends Page implements HasSchemas
 
     public function curseForgeConfigured(): bool
     {
-        return trim((string) config('minecrafttoolkit.curseforge_api_key', '')) !== '';
+        return app(CurseForgeService::class)->isConfigured();
     }
 
     public function hasUsableSource(): bool
@@ -353,7 +353,7 @@ class MinecraftInstallerPage extends Page implements HasSchemas
     private static function hasEnabledSource(): bool
     {
         return (bool) config('minecrafttoolkit.modrinth_enabled', true)
-            || (bool) config('minecrafttoolkit.curseforge_enabled', false);
+            || (bool) config('minecrafttoolkit.curseforge_enabled', true);
     }
 
     private function notifyError(string $title, MinecraftToolkitException $exception): void

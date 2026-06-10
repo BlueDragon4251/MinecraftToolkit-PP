@@ -17,6 +17,7 @@ use BlueWolf\MinecraftToolkit\Services\MinecraftSoftwareService;
 use BlueWolf\MinecraftToolkit\Services\MinecraftUpdateService;
 use BlueWolf\MinecraftToolkit\Services\MinecraftCompatibilityService;
 use BlueWolf\MinecraftToolkit\Services\MinecraftVersionChangeService;
+use BlueWolf\MinecraftToolkit\Services\CurseForgeApiKeyProvider;
 use BlueWolf\MinecraftToolkit\Services\CurseForgeService;
 use Illuminate\Support\ServiceProvider;
 
@@ -27,6 +28,7 @@ class MinecraftToolkitPluginProvider extends ServiceProvider
         $this->app->singleton(MinecraftPropertiesService::class);
         $this->app->singleton(MinecraftPermissionService::class);
         $this->app->singleton(ModrinthService::class);
+        $this->app->singleton(CurseForgeApiKeyProvider::class);
         $this->app->singleton(CurseForgeService::class);
         $this->app->singleton(MinecraftPackageInstaller::class);
         $this->app->singleton(GeyserDownloadService::class);

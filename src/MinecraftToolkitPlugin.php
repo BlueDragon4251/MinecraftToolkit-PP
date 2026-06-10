@@ -7,6 +7,8 @@ namespace BlueWolf\MinecraftToolkit;
 use App\Contracts\Plugins\HasPluginSettings;
 use App\Traits\EnvironmentWriterTrait;
 use Filament\Contracts\Plugin;
+use BlueWolf\MinecraftToolkit\Services\CurseForgeApiKeyProvider;
+use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Panel;
@@ -49,13 +51,32 @@ class MinecraftToolkitPlugin implements HasPluginSettings, Plugin
                 ->default((bool) config('minecrafttoolkit.modrinth_enabled', true)),
             Toggle::make('curseforge_enabled')
                 ->label('CurseForge aktivieren')
-                ->default((bool) config('minecrafttoolkit.curseforge_enabled', false)),
+                ->default((bool) config('minecrafttoolkit.curseforge_enabled', true))
+                ->helperText('Nutzt standardmäßig den BlueIT Toolkit-Proxy. Ein eigener lokaler API-Key ist nur ein optionaler Fallback für private Installationen.'),
+            Placeholder::make('curseforge_key_status')
+                ->label('CurseForge API-Key Status')
+                ->content(fn (): string => app(CurseForgeApiKeyProvider::class)->hasKey()
+                    ? 'Direkter API-Key verfügbar (' . (app(CurseForgeApiKeyProvider::class)->source() ?? 'unbekannte Quelle') . ').'
+                    : ((string) config('minecrafttoolkit.curseforge_proxy_url', '') !== ''
+                        ? 'Toolkit-Proxy aktiv: ' . (string) config('minecrafttoolkit.curseforge_proxy_url')
+                        : 'Kein Toolkit-Proxy und kein lokaler API-Key konfiguriert. CurseForge wird automatisch deaktiviert.')),
+            TextInput::make('curseforge_proxy_url')
+                ->label('CurseForge Toolkit Proxy URL')
+                ->url()
+                ->default((string) config('minecrafttoolkit.curseforge_proxy_url', ''))
+                ->helperText('Standard: https://blueit42.vercel.app/api/curseforge/proxy. Nur ändern, wenn du einen eigenen Proxy betreibst.'),
+            TextInput::make('curseforge_proxy_secret')
+                ->label('CurseForge Proxy Secret')
+                ->password()
+                ->revealable()
+                ->default((string) config('minecrafttoolkit.curseforge_proxy_secret', ''))
+                ->helperText('Standard ist ein öffentlicher BlueIT Release-Token. Nur ändern, wenn du einen eigenen Proxy betreibst.'),
             TextInput::make('curseforge_api_key')
-                ->label('CurseForge API-Key')
+                ->label('CurseForge API-Key Override')
                 ->password()
                 ->revealable()
                 ->default((string) config('minecrafttoolkit.curseforge_api_key', ''))
-                ->helperText('Erforderlich für Suche, Downloads und Dependencies über CurseForge.'),
+                ->helperText('Optionaler direkter Fallback für private Installationen. Öffentliche Releases sollen den Proxy verwenden.'),
             Toggle::make('updater_enabled')
                 ->label('Paket-Updater aktivieren')
                 ->default((bool) config('minecrafttoolkit.updater_enabled', true)),
@@ -93,7 +114,9 @@ class MinecraftToolkitPlugin implements HasPluginSettings, Plugin
             'MINECRAFT_TOOLKIT_ADMINS_ONLY' => (bool) ($data['admins_only'] ?? false),
             'MINECRAFT_TOOLKIT_BACKUP_BEFORE_OVERWRITE' => (bool) ($data['backup_before_overwrite'] ?? true),
             'MINECRAFT_TOOLKIT_MODRINTH_ENABLED' => (bool) ($data['modrinth_enabled'] ?? true),
-            'MINECRAFT_TOOLKIT_CURSEFORGE_ENABLED' => (bool) ($data['curseforge_enabled'] ?? false),
+            'MINECRAFT_TOOLKIT_CURSEFORGE_ENABLED' => (bool) ($data['curseforge_enabled'] ?? true),
+            'MINECRAFT_TOOLKIT_CURSEFORGE_PROXY_URL' => rtrim(trim((string) ($data['curseforge_proxy_url'] ?? '')), '/'),
+            'MINECRAFT_TOOLKIT_CURSEFORGE_PROXY_SECRET' => trim((string) ($data['curseforge_proxy_secret'] ?? '')),
             'MINECRAFT_TOOLKIT_CURSEFORGE_API_KEY' => trim((string) ($data['curseforge_api_key'] ?? '')),
             'MINECRAFT_TOOLKIT_UPDATER_ENABLED' => (bool) ($data['updater_enabled'] ?? true),
             'MINECRAFT_TOOLKIT_VERSION_CHANGE_ENABLED' => (bool) ($data['version_change_enabled'] ?? true),
