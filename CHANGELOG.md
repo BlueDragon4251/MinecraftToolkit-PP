@@ -6,7 +6,10 @@ The changelog is maintained under the current release version. New changes are a
 
 This project is source-available, not open source. See [`LICENSE`](./LICENSE) for usage rights.
 
-## [1.0.0] - Unreleased
+## [1.0.0]
+
+### Notice
+- Curseforge is unavailable for now unless you have you're own API key then you can set it in the Settings of this plugin
 
 ### Added
 
