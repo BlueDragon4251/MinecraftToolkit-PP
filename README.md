@@ -295,7 +295,6 @@ CurseForge access is designed around a backend proxy. This keeps the CurseForge 
 Public installs work out of the box with the default BlueIT proxy values:
 
 ```env
-MINECRAFT_TOOLKIT_CURSEFORGE_PROXY_URL=https://blueit42.vercel.app/api/curseforge/proxy
 MINECRAFT_TOOLKIT_CURSEFORGE_PROXY_SECRET=blueit42-minecraft-toolkit-proxy-v1
 ```
 

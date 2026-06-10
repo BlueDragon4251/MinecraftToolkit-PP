@@ -16,7 +16,7 @@ return [
     'curseforge_enabled' => $boolean(env('MINECRAFT_TOOLKIT_CURSEFORGE_ENABLED', true), true),
     // Public installs use the official BlueIT Toolkit proxy by default, so normal users do not need their own CurseForge key.
     // Override these values through .env if you run your own proxy. The default secret is a public release token, not a private API key.
-    'curseforge_proxy_url' => rtrim((string) env('MINECRAFT_TOOLKIT_CURSEFORGE_PROXY_URL', 'https://blueit42.vercel.app/api/curseforge/proxy'), '/'),
+    //'curseforge_proxy_url' => rtrim((string) env('MINECRAFT_TOOLKIT_CURSEFORGE_PROXY_URL', 'https://blueit42.vercel.app/api/curseforge/proxy'), '/'),
     'curseforge_proxy_secret' => env('MINECRAFT_TOOLKIT_CURSEFORGE_PROXY_SECRET', 'blueit42-minecraft-toolkit-proxy-v1'),
     // Optional local direct API key override for private/selfhosted installs only.
     'curseforge_api_key' => env('MINECRAFT_TOOLKIT_CURSEFORGE_API_KEY', ''),
