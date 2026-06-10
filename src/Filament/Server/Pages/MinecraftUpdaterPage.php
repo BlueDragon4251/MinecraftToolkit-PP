@@ -71,12 +71,12 @@ class MinecraftUpdaterPage extends Page
 
     public static function getNavigationLabel(): string
     {
-        return 'Minecraft Updater';
+        return trans('minecrafttoolkit::strings.navigation.updater');
     }
 
     public function getTitle(): string
     {
-        return 'Minecraft Updater';
+        return trans('minecrafttoolkit::strings.navigation.updater');
     }
 
     public function checkUpdates(): void
@@ -86,7 +86,7 @@ class MinecraftUpdaterPage extends Page
             $available = collect($checks)->where('status', 'update_available')->count();
 
             Notification::make()
-                ->title('Updateprüfung abgeschlossen')
+                ->title(trans('minecrafttoolkit::strings.updater.check_complete'))
                 ->body($available === 1
                     ? 'Für ein Paket ist ein Update verfügbar.'
                     : "Für $available Pakete sind Updates verfügbar.")
@@ -107,7 +107,7 @@ class MinecraftUpdaterPage extends Page
             $package = app(MinecraftUpdateService::class)
                 ->updatePackage($this->server(), $this->setup(), $packageId);
             Notification::make()
-                ->title("{$package->project_name} wurde aktualisiert")
+                ->title(trans('minecrafttoolkit::strings.updater.package_updated', ['name' => $package->project_name]))
                 ->body("Installierte Version: {$package->version_number}")
                 ->success()
                 ->send();
@@ -127,7 +127,7 @@ class MinecraftUpdaterPage extends Page
         try {
             $result = app(MinecraftUpdateService::class)->updateAll($this->server(), $this->setup());
             Notification::make()
-                ->title('Paketupdates abgeschlossen')
+                ->title(trans('minecrafttoolkit::strings.updater.updates_complete'))
                 ->body("Aktualisiert: {$result['updated']}, fehlgeschlagen: {$result['failed']}")
                 ->status($result['failed'] > 0 ? 'warning' : 'success')
                 ->persistent($result['failed'] > 0)

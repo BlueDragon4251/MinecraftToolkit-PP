@@ -38,68 +38,68 @@ class MinecraftToolkitPlugin implements HasPluginSettings, Plugin
     {
         return [
             Toggle::make('enabled')
-                ->label('Minecraft Toolkit aktivieren')
+                ->label(trans('minecrafttoolkit::strings.settings.enabled'))
                 ->default((bool) config('minecrafttoolkit.enabled', true)),
             Toggle::make('admins_only')
-                ->label('Setup nur Administratoren erlauben')
+                ->label(trans('minecrafttoolkit::strings.settings.admins_only'))
                 ->default((bool) config('minecrafttoolkit.admins_only', false)),
             Toggle::make('backup_before_overwrite')
-                ->label('Vor dem Überschreiben Sicherung erstellen')
+                ->label(trans('minecrafttoolkit::strings.settings.backup_before_overwrite'))
                 ->default((bool) config('minecrafttoolkit.backup_before_overwrite', true)),
             Toggle::make('modrinth_enabled')
-                ->label('Modrinth aktivieren')
+                ->label(trans('minecrafttoolkit::strings.settings.modrinth_enabled'))
                 ->default((bool) config('minecrafttoolkit.modrinth_enabled', true)),
             Toggle::make('curseforge_enabled')
-                ->label('CurseForge aktivieren')
+                ->label(trans('minecrafttoolkit::strings.settings.curseforge_enabled'))
                 ->default((bool) config('minecrafttoolkit.curseforge_enabled', true))
-                ->helperText('Nutzt standardmäßig den BlueIT Toolkit-Proxy. Ein eigener lokaler API-Key ist nur ein optionaler Fallback für private Installationen.'),
+                ->helperText(trans('minecrafttoolkit::strings.settings.curseforge_enabled_help')),
             Placeholder::make('curseforge_key_status')
-                ->label('CurseForge API-Key Status')
+                ->label(trans('minecrafttoolkit::strings.settings.curseforge_key_status'))
                 ->content(fn (): string => app(CurseForgeApiKeyProvider::class)->hasKey()
-                    ? 'Direkter API-Key verfügbar (' . (app(CurseForgeApiKeyProvider::class)->source() ?? 'unbekannte Quelle') . ').'
+                    ? trans('minecrafttoolkit::strings.settings.direct_key_available', ['source' => app(CurseForgeApiKeyProvider::class)->source() ?? trans('minecrafttoolkit::strings.settings.unknown_source')])
                     : ((string) config('minecrafttoolkit.curseforge_proxy_url', '') !== ''
-                        ? 'Toolkit-Proxy aktiv: ' . (string) config('minecrafttoolkit.curseforge_proxy_url')
-                        : 'Kein Toolkit-Proxy und kein lokaler API-Key konfiguriert. CurseForge wird automatisch deaktiviert.')),
+                        ? trans('minecrafttoolkit::strings.settings.proxy_active', ['url' => (string) config('minecrafttoolkit.curseforge_proxy_url')])
+                         : trans('minecrafttoolkit::strings.settings.no_proxy_no_key'))) ,
             TextInput::make('curseforge_proxy_url')
-                ->label('CurseForge Toolkit Proxy URL')
+                ->label(trans('minecrafttoolkit::strings.settings.proxy_url'))
                 ->url()
                 ->default((string) config('minecrafttoolkit.curseforge_proxy_url', ''))
-                ->helperText('Standard: https://blueit42.vercel.app/api/curseforge/proxy. Nur ändern, wenn du einen eigenen Proxy betreibst.'),
+                ->helperText(trans('minecrafttoolkit::strings.settings.proxy_url_help')),
             TextInput::make('curseforge_proxy_secret')
-                ->label('CurseForge Proxy Secret')
+                ->label(trans('minecrafttoolkit::strings.settings.proxy_secret'))
                 ->password()
                 ->revealable()
                 ->default((string) config('minecrafttoolkit.curseforge_proxy_secret', ''))
-                ->helperText('Standard ist ein öffentlicher BlueIT Release-Token. Nur ändern, wenn du einen eigenen Proxy betreibst.'),
+                ->helperText(trans('minecrafttoolkit::strings.settings.proxy_secret_help')),
             TextInput::make('curseforge_api_key')
-                ->label('CurseForge API-Key Override')
+                ->label(trans('minecrafttoolkit::strings.settings.api_key_override'))
                 ->password()
                 ->revealable()
                 ->default((string) config('minecrafttoolkit.curseforge_api_key', ''))
-                ->helperText('Optionaler direkter Fallback für private Installationen. Öffentliche Releases sollen den Proxy verwenden.'),
+                ->helperText(trans('minecrafttoolkit::strings.settings.api_key_override_help')),
             Toggle::make('updater_enabled')
-                ->label('Paket-Updater aktivieren')
+                ->label(trans('minecrafttoolkit::strings.settings.updater_enabled'))
                 ->default((bool) config('minecrafttoolkit.updater_enabled', true)),
             Toggle::make('version_change_enabled')
-                ->label('Minecraft-Versionswechsel aktivieren')
+                ->label(trans('minecrafttoolkit::strings.settings.version_change_enabled'))
                 ->default((bool) config('minecrafttoolkit.version_change_enabled', true)),
             Toggle::make('version_change_users_enabled')
-                ->label('Serverbesitzern Versionswechsel erlauben')
+                ->label(trans('minecrafttoolkit::strings.settings.version_change_users_enabled'))
                 ->default((bool) config('minecrafttoolkit.version_change_users_enabled', true)),
             Toggle::make('crossplay_enabled')
-                ->label('Crossplay für Paper und Purpur aktivieren')
+                ->label(trans('minecrafttoolkit::strings.settings.crossplay_enabled'))
                 ->default((bool) config('minecrafttoolkit.crossplay_enabled', true)),
             Toggle::make('bedrock_port_required')
-                ->label('Zusätzlichen Bedrock-Port verlangen')
+                ->label(trans('minecrafttoolkit::strings.settings.bedrock_port_required'))
                 ->default((bool) config('minecrafttoolkit.bedrock_port_required', true)),
             TextInput::make('http_timeout')
-                ->label('API-Timeout in Sekunden')
+                ->label(trans('minecrafttoolkit::strings.settings.http_timeout'))
                 ->numeric()
                 ->minValue(5)
                 ->required()
                 ->default((int) config('minecrafttoolkit.http_timeout', 20)),
             TextInput::make('download_timeout')
-                ->label('Download-Timeout in Sekunden')
+                ->label(trans('minecrafttoolkit::strings.settings.download_timeout'))
                 ->numeric()
                 ->minValue(30)
                 ->required()

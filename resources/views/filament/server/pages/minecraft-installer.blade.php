@@ -1,8 +1,8 @@
 <x-filament-panels::page>
     @if (config('minecrafttoolkit.curseforge_enabled') && !$this->curseForgeConfigured())
-        <x-filament::section heading="CurseForge ist nicht konfiguriert">
+        <x-filament::section :heading="trans('minecrafttoolkit::strings.installer.missing_proxy')">
             <p class="text-sm text-gray-600 dark:text-gray-300">
-                CurseForge ist deaktiviert, weil dieser Plugin-Build keinen zentralen API-Key enthält und kein lokaler Override gesetzt wurde.
+                {{ trans('minecrafttoolkit::strings.installer.missing_proxy_body') }}
             </p>
         </x-filament::section>
     @endif
@@ -10,35 +10,29 @@
     <form wire:submit="search">
         {{ $this->form }}
 
-        <div class="mt-4">
-            <x-filament::button
-                type="submit"
-                icon="tabler-search"
-                :disabled="!$this->hasUsableSource()"
-                wire:loading.attr="disabled"
-            >
-                {{ $this->sourceLabel() }} durchsuchen
+        <div class="mt-4 flex flex-wrap gap-3">
+            <x-filament::button type="submit" icon="tabler-search" :disabled="!$this->hasUsableSource()" wire:loading.attr="disabled">
+                {{ trans('minecrafttoolkit::strings.installer.browse_source', ['source' => $this->sourceLabel()]) }}
+            </x-filament::button>
+            <x-filament::button type="button" color="gray" icon="tabler-list" :disabled="!$this->hasUsableSource()" wire:click="loadFeatured" wire:loading.attr="disabled">
+                {{ trans('minecrafttoolkit::strings.installer.show_popular') }}
             </x-filament::button>
         </div>
     </form>
 
     @if ($candidate)
-        <x-filament::section heading="Installation prüfen">
+        <x-filament::section :heading="trans('minecrafttoolkit::strings.installer.review_install')">
             <div class="space-y-5">
                 <div class="flex items-start gap-4">
                     @if ($candidate['project']['icon_url'])
-                        <img
-                            src="{{ $candidate['project']['icon_url'] }}"
-                            alt=""
-                            class="h-16 w-16 rounded-lg object-cover"
-                        >
+                        <img src="{{ $candidate['project']['icon_url'] }}" alt="" class="h-16 w-16 rounded-lg object-cover">
                     @endif
                     <div>
                         <h3 class="text-lg font-semibold">{{ $candidate['project']['title'] }}</h3>
                         <p class="text-sm text-gray-500 dark:text-gray-400">{{ $candidate['project']['description'] }}</p>
                         <p class="mt-2 text-sm">
-                            Version: <strong>{{ $candidate['version']['version_number'] }}</strong>
-                            · Datei: <code>{{ $candidate['version']['selected_file']['filename'] }}</code>
+                            {{ trans('minecrafttoolkit::strings.installer.version') }}: <strong>{{ $candidate['version']['version_number'] }}</strong>
+                            · {{ trans('minecrafttoolkit::strings.installer.file') }}: <code>{{ $candidate['version']['selected_file']['filename'] }}</code>
                         </p>
                     </div>
                 </div>
@@ -50,7 +44,7 @@
                 @endif
 
                 <div>
-                    <h4 class="font-medium">Dependencies</h4>
+                    <h4 class="font-medium">{{ trans('minecrafttoolkit::strings.installer.dependencies') }}</h4>
                     <div class="mt-2 space-y-2">
                         @forelse ($candidate['dependencies'] as $dependency)
                             <div class="flex items-center justify-between rounded-lg border border-gray-200 p-3 dark:border-white/10">
@@ -59,30 +53,26 @@
                                     <span class="ml-2 text-xs uppercase text-gray-500">{{ $dependency['type'] }}</span>
                                 </div>
                                 <span class="text-sm {{ $dependency['installed'] ? 'text-success-600' : ($dependency['type'] === 'required' ? 'text-danger-600' : 'text-gray-500') }}">
-                                    {{ $dependency['installed'] ? 'Installiert' : 'Nicht installiert' }}
+                                    {{ $dependency['installed'] ? trans('minecrafttoolkit::strings.installer.installed') : trans('minecrafttoolkit::strings.installer.not_installed') }}
                                 </span>
                                 @if (!$dependency['installed'] && $dependency['project_id'])
-                                    <x-filament::button
-                                        size="xs"
-                                        color="gray"
-                                        wire:click="selectProject('{{ $dependency['project_id'] }}')"
-                                    >
-                                        Dependency prüfen
+                                    <x-filament::button size="xs" color="gray" wire:click="selectProject('{{ $dependency['project_id'] }}')">
+                                        {{ trans('minecrafttoolkit::strings.installer.check_dependency') }}
                                     </x-filament::button>
                                 @endif
                             </div>
                         @empty
-                            <p class="text-sm text-gray-500">Für diese Version meldet die Quelle keine Dependencies.</p>
+                            <p class="text-sm text-gray-500">{{ trans('minecrafttoolkit::strings.installer.no_dependencies') }}</p>
                         @endforelse
                     </div>
                 </div>
 
                 <div class="flex gap-3">
                     <x-filament::button wire:click="installSelected" icon="tabler-download" wire:loading.attr="disabled">
-                        {{ $this->packageLabel() }} installieren
+                        {{ trans('minecrafttoolkit::strings.installer.install_package', ['package' => $this->packageLabel()]) }}
                     </x-filament::button>
                     <x-filament::button wire:click="clearSelection" color="gray">
-                        Abbrechen
+                        {{ trans('minecrafttoolkit::strings.installer.cancel') }}
                     </x-filament::button>
                 </div>
             </div>
@@ -90,7 +80,7 @@
     @endif
 
     @if ($results !== [])
-        <x-filament::section heading="Suchergebnisse">
+        <x-filament::section :heading="$resultsTitle">
             <div class="grid gap-4 lg:grid-cols-2">
                 @foreach ($results as $result)
                     <div class="flex gap-4 rounded-xl border border-gray-200 p-4 dark:border-white/10">
@@ -101,45 +91,41 @@
                             <div class="flex items-start justify-between gap-3">
                                 <div>
                                     <h3 class="font-semibold">{{ $result['title'] }}</h3>
-                                    <p class="text-xs text-gray-500">
-                                        {{ $result['author'] }} · {{ number_format($result['downloads']) }} Downloads
-                                    </p>
+                                    <p class="text-xs text-gray-500">{{ $result['author'] }} · {{ number_format($result['downloads']) }} {{ trans('minecrafttoolkit::strings.installer.downloads') }}</p>
                                 </div>
-                                <x-filament::button
-                                    size="sm"
-                                    wire:click="selectProject('{{ $result['project_id'] }}')"
-                                    wire:loading.attr="disabled"
-                                >
-                                    Prüfen
+                                <x-filament::button size="sm" wire:click="selectProject('{{ $result['project_id'] }}')" wire:loading.attr="disabled">
+                                    {{ trans('minecrafttoolkit::strings.installer.check') }}
                                 </x-filament::button>
                             </div>
-                            <p class="mt-2 line-clamp-2 text-sm text-gray-600 dark:text-gray-300">
-                                {{ $result['description'] }}
-                            </p>
+                            <p class="mt-2 line-clamp-2 text-sm text-gray-600 dark:text-gray-300">{{ $result['description'] }}</p>
                         </div>
                     </div>
                 @endforeach
             </div>
+
+            <div class="mt-4 flex items-center justify-between gap-3">
+                <x-filament::button color="gray" size="sm" wire:click="previousResultsPage" :disabled="$resultPage === 0" wire:loading.attr="disabled">
+                    {{ trans('minecrafttoolkit::strings.installer.previous') }}
+                </x-filament::button>
+                <span class="text-sm text-gray-500">{{ trans('minecrafttoolkit::strings.installer.page', ['page' => $resultPage + 1]) }}</span>
+                <x-filament::button color="gray" size="sm" wire:click="nextResultsPage" wire:loading.attr="disabled">
+                    {{ trans('minecrafttoolkit::strings.installer.next') }}
+                </x-filament::button>
+            </div>
         </x-filament::section>
     @endif
 
-    <x-filament::section :heading="'Installierte ' . $this->packageLabel(true)">
+    <x-filament::section :heading="trans('minecrafttoolkit::strings.installer.installed_heading', ['packages' => $this->packageLabel(true)])">
         <div class="space-y-3">
             @forelse ($installedPackages as $package)
                 <div class="flex items-center justify-between rounded-lg border border-gray-200 p-3 dark:border-white/10">
                     <div>
                         <div class="font-medium">{{ $package['project_name'] }}</div>
-                        <div class="text-xs text-gray-500">
-                            {{ $package['version_number'] ?: 'Version unbekannt' }} · {{ $package['file_name'] }}
-                        </div>
-                    </div>
-                    <div class="text-right text-xs text-gray-500">
-                        <div>{{ ucfirst($package['source']) }}</div>
-                        <div>{{ $package['installed_at'] }}</div>
+                        <div class="text-sm text-gray-500">{{ ucfirst($package['source']) }} · {{ $package['version_number'] ?: '—' }} · {{ $package['file_name'] }}</div>
                     </div>
                 </div>
             @empty
-                <p class="text-sm text-gray-500">Noch keine {{ $this->packageLabel(true) }} mit Minecraft Toolkit installiert.</p>
+                <p class="text-sm text-gray-500">{{ trans('minecrafttoolkit::strings.installer.no_installed') }}</p>
             @endforelse
         </div>
     </x-filament::section>

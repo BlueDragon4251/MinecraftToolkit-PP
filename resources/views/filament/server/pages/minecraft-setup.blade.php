@@ -4,7 +4,7 @@
 
         <div class="mt-6">
             <x-filament::button type="submit" icon="tabler-player-play">
-                Setup starten
+                {{ trans('minecrafttoolkit::strings.setup.review') }}
             </x-filament::button>
         </div>
     </form>

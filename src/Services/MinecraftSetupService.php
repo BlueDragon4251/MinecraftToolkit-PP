@@ -22,6 +22,7 @@ class MinecraftSetupService
         private readonly MinecraftServerFileService $files,
         private readonly MinecraftServerStateService $state,
         private readonly MinecraftCrossplayService $crossplay,
+        private readonly MinecraftPackageInstaller $packageInstaller,
     ) {}
 
     /** @param array<string, mixed> $data */
@@ -154,7 +155,16 @@ class MinecraftSetupService
                 ]
             );
 
-            $this->log($server, 'setup_completed', 'success', 'Minecraft-Setup wurde erfolgreich abgeschlossen.');
+            $setupPackageFailures = $this->installSelectedSetupPackages($server, $setup->refresh(), $data['setup_package_ids'] ?? []);
+            if ($setupPackageFailures !== []) {
+                $setup->forceFill([
+                    'last_error' => 'Einige ausgewählte Pakete konnten nach dem Setup nicht installiert werden: ' . implode('; ', $setupPackageFailures),
+                ])->save();
+            }
+
+            $this->log($server, 'setup_completed', $setupPackageFailures === [] ? 'success' : 'warning', $setupPackageFailures === []
+                ? 'Minecraft-Setup wurde erfolgreich abgeschlossen.'
+                : 'Minecraft-Setup wurde abgeschlossen, aber einige ausgewählte Pakete konnten nicht installiert werden.');
             if ($download['installer']) {
                 $this->log(
                     $server,
@@ -224,6 +234,42 @@ class MinecraftSetupService
             'geyser_enabled' => false,
             'floodgate_enabled' => false,
         ];
+    }
+
+    /** @param mixed $selectedPackages
+     *  @return string[]
+     */
+    private function installSelectedSetupPackages(Server $server, MinecraftToolkitSetup $setup, mixed $selectedPackages): array
+    {
+        if (!is_array($selectedPackages) || $selectedPackages === []) {
+            return [];
+        }
+
+        $failures = [];
+        foreach (array_values(array_unique(array_filter($selectedPackages, 'is_string'))) as $selectedPackage) {
+            if (!str_contains($selectedPackage, ':')) {
+                continue;
+            }
+
+            [$source, $projectId] = explode(':', $selectedPackage, 2);
+            try {
+                match ($source) {
+                    'modrinth' => $this->packageInstaller->installModrinthPackage($server, $setup, $projectId),
+                    'curseforge' => $this->packageInstaller->installCurseForgePackage($server, $setup, $projectId),
+                    default => throw new MinecraftToolkitException('Ungültige Paketquelle.'),
+                };
+            } catch (\Throwable $exception) {
+                $failures[] = "$source:$projectId - " . ($exception instanceof MinecraftToolkitException
+                    ? $exception->getMessage()
+                    : 'Technischer Fehler');
+                $this->log($server, 'setup_package_install_failed', 'warning', end($failures) ?: 'Paketinstallation fehlgeschlagen.', [
+                    'selected_package' => $selectedPackage,
+                    'exception' => $exception::class,
+                ]);
+            }
+        }
+
+        return $failures;
     }
 
     private function writeIcon(Server $server, mixed $icon): bool

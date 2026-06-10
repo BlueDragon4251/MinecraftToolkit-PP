@@ -40,6 +40,29 @@ class ModrinthService
         return $this->searchPackages($query, $setup, $limit);
     }
 
+    /** @return array<int, array<string, mixed>> */
+    public function popularPackages(MinecraftToolkitSetup $setup, int $offset = 0, int $limit = 20): array
+    {
+        $this->assertEnabled();
+
+        if (!in_array($setup->software, ['paper', 'purpur', 'folia', 'fabric', 'forge', 'neoforge'], true)) {
+            return [];
+        }
+
+        $facets = $this->searchFacets($setup);
+        $offset = max(0, $offset);
+        $limit = min(max($limit, 1), 100);
+        $key = 'minecrafttoolkit.modrinth.popular.' . sha1(json_encode([$facets, $offset, $limit], JSON_THROW_ON_ERROR));
+        $data = Cache::remember($key, now()->addMinutes(10), fn (): array => $this->get('/search', [
+            'facets' => json_encode($facets, JSON_THROW_ON_ERROR),
+            'index' => 'downloads',
+            'offset' => $offset,
+            'limit' => $limit,
+        ]));
+
+        return $this->normalizeSearchResults($data['hits'] ?? []);
+    }
+
     /** @return array{project: array<string, mixed>, version: array<string, mixed>, dependencies: array<int, array<string, mixed>>, warning: ?string} */
     public function installationCandidate(string $projectId, MinecraftToolkitSetup $setup): array
     {
