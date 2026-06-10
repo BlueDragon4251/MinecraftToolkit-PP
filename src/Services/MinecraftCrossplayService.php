@@ -96,12 +96,19 @@ class MinecraftCrossplayService
         $this->log($server, 'crossplay_configured', 'success', 'Geyser wurde auf Floodgate-Authentifizierung konfiguriert.');
     }
 
-    public function patchConfig(string $yaml, int $bedrockPort): string
+    public function patchConfig(string $yaml, int $bedrockPort, ?string $motd = null): string
     {
+        $motd = trim((string) $motd);
         $yaml = $this->patchYamlSectionValue($yaml, 'bedrock', 'port', (string) $bedrockPort);
         $yaml = $this->patchYamlSectionValue($yaml, 'bedrock', 'address', '0.0.0.0');
         $yaml = $this->patchYamlSectionValue($yaml, 'bedrock', 'clone-remote-port', 'false');
+        if ($motd !== '') {
+            $yaml = $this->patchYamlSectionValue($yaml, 'bedrock', 'motd1', $this->quoteYamlValue($motd));
+            $yaml = $this->patchYamlSectionValue($yaml, 'bedrock', 'motd2', $this->quoteYamlValue('Minecraft Toolkit'));
+        }
+
         $yaml = $this->patchYamlSectionValue($yaml, 'remote', 'auth-type', 'floodgate');
+        $yaml = $this->forceAuthTypeFloodgate($yaml);
 
         return rtrim($yaml) . "\n";
     }
@@ -139,10 +146,35 @@ class MinecraftCrossplayService
         $this->files->write(
             $server,
             self::CONFIG_PATH,
-            $this->patchConfig($contents, (int) $setup->bedrock_allocation_port)
+            $this->patchConfig($contents, (int) $setup->bedrock_allocation_port, (string) $setup->motd)
         );
 
         return true;
+    }
+
+    private function forceAuthTypeFloodgate(string $yaml): string
+    {
+        $lines = preg_split('/\R/', $yaml) ?: [];
+        $found = false;
+
+        foreach ($lines as $index => $line) {
+            if (preg_match('/^(\s*)auth-type\s*:\s*.*$/i', $line, $match)) {
+                $lines[$index] = ($match[1] ?? '') . 'auth-type: floodgate';
+                $found = true;
+            }
+        }
+
+        if (!$found) {
+            $yaml = $this->patchYamlSectionValue(implode("\n", $lines), 'remote', 'auth-type', 'floodgate');
+            return $yaml;
+        }
+
+        return implode("\n", $lines);
+    }
+
+    private function quoteYamlValue(string $value): string
+    {
+        return '"' . str_replace(['\\', '"', "\r", "\n"], ['\\\\', '\\"', '', ' '], $value) . '"';
     }
 
     private function patchYamlSectionValue(string $yaml, string $section, string $key, string $value): string

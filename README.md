@@ -15,13 +15,16 @@ No CurseForge API key is included in the public plugin source. CurseForge access
 - Guided setup for Vanilla Java, Vanilla Bedrock, Paper, Folia, Purpur, Fabric, Forge, and NeoForge
 - Automatic Minecraft and loader version selection from official sources
 - Generation of `eula.txt` and `server.properties`
+- Optional plugin/mod selection during setup; selected packages are installed immediately after setup completes
+- Installer opens with popular compatible Modrinth/CurseForge packages even before searching
+- MOTD formatter helper for Minecraft color and style codes
 - Primary server port taken from the Pelican allocation
 - Optional validated 64x64 PNG server icon
 - Modrinth plugin installation for Paper, Purpur, and Folia
 - Modrinth mod installation for Fabric, Forge, and NeoForge
 - CurseForge plugin and mod installation through a Toolkit backend proxy or optional private local API key
 - Required and optional dependency review
-- Optional Geyser and Floodgate crossplay for Paper and Purpur
+- Optional Geyser and Floodgate crossplay for Paper and Purpur, including Bedrock port, Floodgate auth-type, and Geyser MOTD patching
 - Update checks for managed Modrinth, Geyser, and Floodgate packages
 - Individual and bulk package updates
 - Minecraft version changes with package compatibility checks
@@ -76,7 +79,8 @@ The directory name must remain `minecrafttoolkit`, because it must match the plu
 7. Configure the MOTD, world name, player limit, and gameplay settings.
 8. Optionally upload a 64x64 PNG server icon.
 9. For Paper or Purpur, optionally enable crossplay and select a Bedrock allocation. Folia intentionally does not expose the crossplay switch because Paper plugin compatibility is not guaranteed.
-10. Review the setup and start it.
+10. Optionally select multiple compatible plugins or mods that should be installed directly after setup.
+11. Review the setup and start it.
 
 Existing target files are moved to:
 
@@ -105,7 +109,7 @@ The Java version in the server image must support the selected Minecraft version
 After setup, open **Minecraft Installer**:
 
 1. Select Modrinth or CurseForge.
-2. Search for a project.
+2. Browse the automatically loaded popular compatible package list or search for a project.
 3. Review the selected compatible version and its dependencies.
 4. Stop the server if it is running.
 5. Install the package.
@@ -252,6 +256,12 @@ Users without the required permissions do not see the corresponding Toolkit page
 - Existing files are backed up before replacement.
 - Technical exceptions are written to the Laravel log while the UI receives a short error message.
 
+## MOTD formatting
+
+The setup page includes a small MOTD formatter. Users can choose a color and basic styles such as bold, italic, and underline. The generated Minecraft formatting-code MOTD is written into `server.properties`. Advanced users can still type Minecraft formatting codes manually, for example `§aGreen §lBold §rNormal`.
+
+For Paper/Purpur crossplay, applying the Crossplay configuration also patches Geyser to use Floodgate authentication and writes the selected MOTD into Geyser's Bedrock MOTD fields where possible.
+
 ## Troubleshooting
 
 - **Minecraft pages are missing:** verify the plugin is enabled, migrations completed, and run `php artisan optimize:clear`.
@@ -309,3 +319,10 @@ MINECRAFT_TOOLKIT_CURSEFORGE_API_KEY=local_direct_key
 
 Do not ship CurseForge API keys inside public plugin builds. The public plugin contains only the default proxy URL and a public release token. If no proxy and no direct private key are configured, CurseForge disables itself safely and Modrinth continues to work.
 
+
+
+## Languages
+
+Minecraft Toolkit includes English and German plugin translations.
+
+The plugin automatically uses German when the current Pelican/user locale starts with `de` such as `de`, `de_AT`, or `de_DE`. For every other locale, the plugin injects English strings as the fallback so users do not see untranslated German UI text.

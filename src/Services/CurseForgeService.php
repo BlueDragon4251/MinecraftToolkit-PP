@@ -49,6 +49,31 @@ class CurseForgeService
         return $this->normalizeSearchResults($response['data'] ?? []);
     }
 
+    /** @return array<int, array<string, mixed>> */
+    public function popularPackages(MinecraftToolkitSetup $setup, int $offset = 0, int $limit = 20): array
+    {
+        $this->assertEnabled();
+
+        if (!in_array($setup->software, ['paper', 'purpur', 'folia', 'fabric', 'forge', 'neoforge'], true)) {
+            return [];
+        }
+
+        $params = $this->searchParameters($setup) + [
+            'sortField' => 2,
+            'sortOrder' => 'desc',
+            'index' => max(0, $offset),
+            'pageSize' => min(max($limit, 1), 50),
+        ];
+        $key = 'minecrafttoolkit.curseforge.popular.' . sha1(json_encode($params, JSON_THROW_ON_ERROR));
+        $response = Cache::remember(
+            $key,
+            now()->addMinutes(10),
+            fn (): array => $this->get('/mods/search', $params)
+        );
+
+        return $this->normalizeSearchResults($response['data'] ?? []);
+    }
+
     /** @return array{project: array<string, mixed>, version: array<string, mixed>, dependencies: array<int, array<string, mixed>>, warning: ?string} */
     public function installationCandidate(string $projectId, MinecraftToolkitSetup $setup): array
     {

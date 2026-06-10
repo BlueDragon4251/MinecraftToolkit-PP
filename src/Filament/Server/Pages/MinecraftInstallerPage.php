@@ -53,6 +53,10 @@ class MinecraftInstallerPage extends Page implements HasSchemas
     /** @var array<int, array<string, mixed>> */
     public array $installedPackages = [];
 
+    public int $resultPage = 0;
+
+    public string $resultsTitle = '';
+
     public function mount(): void
     {
         $this->authorizeAccess();
@@ -61,6 +65,7 @@ class MinecraftInstallerPage extends Page implements HasSchemas
             'query' => '',
         ]);
         $this->refreshInstalledPackages();
+        $this->loadFeatured();
     }
 
     public static function canAccess(): bool
@@ -94,12 +99,12 @@ class MinecraftInstallerPage extends Page implements HasSchemas
 
     public static function getNavigationLabel(): string
     {
-        return 'Minecraft Installer';
+        return trans('minecrafttoolkit::strings.navigation.installer');
     }
 
     public function getTitle(): string
     {
-        return 'Minecraft Installer';
+        return trans('minecrafttoolkit::strings.navigation.installer');
     }
 
     protected function getFormStatePath(): ?string
@@ -110,66 +115,88 @@ class MinecraftInstallerPage extends Page implements HasSchemas
     protected function getFormSchema(): array
     {
         return [
-            Section::make('Paketquelle durchsuchen')
-                ->description(fn (): string => $this->selectedSource() === 'curseforge'
-                    ? sprintf(
-                        'Es werden kompatible %s für Minecraft %s und den Loader %s angezeigt. Prüfe bei Mods die Projektbeschreibung auf Server-Kompatibilität.',
-                        $this->packageLabel(true),
-                        $this->setup()->minecraft_version,
-                        ucfirst($this->setup()->software)
-                    )
-                    : sprintf(
-                        'Es werden nur serverseitige %s für Minecraft %s und den Loader %s angezeigt.',
-                        $this->packageLabel(true),
-                        $this->setup()->minecraft_version,
-                        ucfirst($this->setup()->software)
-                    ))
+            Section::make(trans('minecrafttoolkit::strings.installer.package_source'))
+                ->description(trans('minecrafttoolkit::strings.installer.search_help'))
                 ->schema([
                     Select::make('source')
-                        ->label('Quelle')
+                        ->label(trans('minecrafttoolkit::strings.setup.source'))
                         ->options($this->sourceOptions())
                         ->disableOptionWhen(fn (string $value): bool => $value === 'curseforge'
                             && !$this->curseForgeConfigured())
                         ->live()
                         ->afterStateUpdated(function (Set $set): void {
                             $set('query', '');
-                            $this->results = [];
+                            $this->resultPage = 0;
                             $this->candidate = null;
+                            $this->loadFeatured();
                         })
                         ->required(),
                     TextInput::make('query')
-                        ->label($this->packageLabel() . ' suchen')
+                        ->label(trans('minecrafttoolkit::strings.installer.search', ['package' => $this->packageLabel()]))
                         ->placeholder($this->setup()->software === 'fabric'
-                            ? 'Zum Beispiel Fabric API, Lithium oder Simple Voice Chat'
-                            : 'Projektname')
-                        ->minLength(2)
+                            ? trans('minecrafttoolkit::strings.installer.fabric_placeholder')
+                            : trans('minecrafttoolkit::strings.installer.project_placeholder'))
                         ->maxLength(100)
-                        ->required(),
+                        ->helperText(trans('minecrafttoolkit::strings.installer.search_help')),
                 ]),
         ];
     }
 
     public function search(): void
     {
+        $this->resultPage = 0;
+        $this->runSearch();
+    }
+
+    public function loadFeatured(): void
+    {
+        $this->resultPage = 0;
+        $this->runSearch(true);
+    }
+
+    public function nextResultsPage(): void
+    {
+        $this->resultPage++;
+        $this->runSearch(trim((string) ($this->data['query'] ?? '')) === '');
+    }
+
+    public function previousResultsPage(): void
+    {
+        $this->resultPage = max(0, $this->resultPage - 1);
+        $this->runSearch(trim((string) ($this->data['query'] ?? '')) === '');
+    }
+
+    private function runSearch(bool $forcePopular = false): void
+    {
         try {
-            $query = (string) ($this->form->getState()['query'] ?? '');
+            $query = trim((string) ($this->form->getState()['query'] ?? ''));
             $source = $this->selectedSource();
             $this->candidate = null;
+            $offset = $this->resultPage * 20;
+            $popular = $forcePopular || $query === '';
+            $this->resultsTitle = $popular
+                ? trans('minecrafttoolkit::strings.installer.featured') . ' - ' . $this->packageLabel(true)
+                : 'Search: “' . $query . '”';
+
             $this->results = match ($source) {
-                'modrinth' => app(ModrinthService::class)->searchPackages($query, $this->setup()),
-                'curseforge' => app(CurseForgeService::class)->searchPackages($query, $this->setup()),
-                default => throw new MinecraftToolkitException('Wähle eine gültige Paketquelle.'),
+                'modrinth' => $popular
+                    ? app(ModrinthService::class)->popularPackages($this->setup(), $offset)
+                    : app(ModrinthService::class)->searchPackages($query, $this->setup()),
+                'curseforge' => $popular
+                    ? app(CurseForgeService::class)->popularPackages($this->setup(), $offset)
+                    : app(CurseForgeService::class)->searchPackages($query, $this->setup()),
+                default => throw new MinecraftToolkitException(trans('minecrafttoolkit::strings.installer.invalid_source')),
             };
 
             if ($this->results === []) {
                 Notification::make()
-                    ->title('Keine kompatiblen ' . $this->packageLabel(true) . ' gefunden')
+                    ->title(trans('minecrafttoolkit::strings.installer.none_found', ['packages' => $this->packageLabel(true)]))
                     ->warning()
                     ->send();
             }
         } catch (MinecraftToolkitException $exception) {
             $this->results = [];
-            $this->notifyError($this->sourceLabel() . '-Suche fehlgeschlagen', $exception);
+            $this->notifyError(trans('minecrafttoolkit::strings.installer.search_failed', ['source' => $this->sourceLabel()]), $exception);
         }
     }
 
@@ -180,7 +207,7 @@ class MinecraftInstallerPage extends Page implements HasSchemas
             $candidate = match ($source) {
                 'modrinth' => app(ModrinthService::class)->installationCandidate($projectId, $this->setup()),
                 'curseforge' => app(CurseForgeService::class)->installationCandidate($projectId, $this->setup()),
-                default => throw new MinecraftToolkitException('Wähle eine gültige Paketquelle.'),
+                default => throw new MinecraftToolkitException(trans('minecrafttoolkit::strings.installer.invalid_source')),
             };
             $candidate['source'] = $source;
             $installedProjectIds = MinecraftToolkitPackage::query()
@@ -201,7 +228,7 @@ class MinecraftInstallerPage extends Page implements HasSchemas
             $this->candidate = $candidate;
         } catch (MinecraftToolkitException $exception) {
             $this->candidate = null;
-            $this->notifyError($this->packageLabel() . ' konnte nicht geprüft werden', $exception);
+            $this->notifyError(trans('minecrafttoolkit::strings.installer.check_failed', ['package' => $this->packageLabel()]), $exception);
         }
     }
 
@@ -215,8 +242,8 @@ class MinecraftInstallerPage extends Page implements HasSchemas
         $projectId = $this->candidate['project']['project_id'] ?? null;
         if (!is_string($projectId)) {
             $this->notifyError(
-                'Installation nicht möglich',
-                new MinecraftToolkitException('Es wurde kein gültiges Paket ausgewählt.')
+                trans('minecrafttoolkit::strings.installer.invalid_selection'),
+                new MinecraftToolkitException(trans('minecrafttoolkit::strings.installer.invalid_selection_body'))
             );
 
             return;
@@ -229,7 +256,7 @@ class MinecraftInstallerPage extends Page implements HasSchemas
                     ->installModrinthPackage($this->server(), $this->setup(), $projectId),
                 'curseforge' => app(MinecraftPackageInstaller::class)
                     ->installCurseForgePackage($this->server(), $this->setup(), $projectId),
-                default => throw new MinecraftToolkitException('Wähle eine gültige Paketquelle.'),
+                default => throw new MinecraftToolkitException(trans('minecrafttoolkit::strings.installer.invalid_source')),
             };
 
             $requiredMissing = collect($this->candidate['dependencies'] ?? [])
@@ -238,10 +265,10 @@ class MinecraftInstallerPage extends Page implements HasSchemas
                 ->count();
 
             Notification::make()
-                ->title("{$package->project_name} wurde installiert")
+                ->title(trans('minecrafttoolkit::strings.installer.installed_title', ['name' => $package->project_name]))
                 ->body($requiredMissing > 0
-                    ? "$requiredMissing erforderliche Dependencies sind noch nicht installiert. Prüfe und installiere sie separat über die Suche."
-                    : "Die JAR wurde über Wings nach /{$this->packageDirectory()} geschrieben.")
+                    ? trans('minecrafttoolkit::strings.installer.missing_dependencies', ['count' => $requiredMissing])
+                    : trans('minecrafttoolkit::strings.installer.written_to', ['directory' => $this->packageDirectory()]))
                 ->success()
                 ->persistent($requiredMissing > 0)
                 ->send();
@@ -249,7 +276,7 @@ class MinecraftInstallerPage extends Page implements HasSchemas
             $this->candidate = null;
             $this->refreshInstalledPackages();
         } catch (MinecraftToolkitException $exception) {
-            $this->notifyError($this->packageLabel() . '-Installation fehlgeschlagen', $exception);
+            $this->notifyError(trans('minecrafttoolkit::strings.installer.install_failed', ['package' => $this->packageLabel()]), $exception);
         }
     }
 
@@ -295,8 +322,8 @@ class MinecraftInstallerPage extends Page implements HasSchemas
         $isPlugin = in_array($this->setup()->software, ['paper', 'purpur', 'folia'], true);
 
         return $isPlugin
-            ? ($plural ? 'Plugins' : 'Plugin')
-            : ($plural ? 'Mods' : 'Mod');
+            ? ($plural ? trans('minecrafttoolkit::strings.installer.plugins') : trans('minecrafttoolkit::strings.installer.plugin'))
+            : ($plural ? trans('minecrafttoolkit::strings.installer.mods') : trans('minecrafttoolkit::strings.installer.mod'));
     }
 
     public function packageDirectory(): string
@@ -315,7 +342,7 @@ class MinecraftInstallerPage extends Page implements HasSchemas
         ) {
             $options['curseforge'] = $this->curseForgeConfigured()
                 ? 'CurseForge'
-                : 'CurseForge (Proxy/API-Key fehlt)';
+                : trans('minecrafttoolkit::strings.installer.proxy_missing_label');
         }
 
         return $options;
@@ -323,7 +350,7 @@ class MinecraftInstallerPage extends Page implements HasSchemas
 
     public function sourceLabel(): string
     {
-        return $this->sourceOptions()[$this->selectedSource()] ?? 'Paketquelle';
+        return $this->sourceOptions()[$this->selectedSource()] ?? trans('minecrafttoolkit::strings.installer.package_source');
     }
 
     public function curseForgeConfigured(): bool

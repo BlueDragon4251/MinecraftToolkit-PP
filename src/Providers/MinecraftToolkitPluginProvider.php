@@ -20,6 +20,7 @@ use BlueWolf\MinecraftToolkit\Services\MinecraftVersionChangeService;
 use BlueWolf\MinecraftToolkit\Services\CurseForgeApiKeyProvider;
 use BlueWolf\MinecraftToolkit\Services\CurseForgeService;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Facades\Lang;
 
 class MinecraftToolkitPluginProvider extends ServiceProvider
 {
@@ -42,5 +43,42 @@ class MinecraftToolkitPluginProvider extends ServiceProvider
         $this->app->singleton(MinecraftSetupService::class);
     }
 
-    public function boot(): void {}
+    public function boot(): void
+    {
+        $this->loadTranslationsFrom(plugin_path('minecrafttoolkit', 'lang'), 'minecrafttoolkit');
+        $this->loadPluginTranslationsForCurrentLocale();
+    }
+
+    private function loadPluginTranslationsForCurrentLocale(): void
+    {
+        $locale = (string) app()->getLocale();
+        $targetLocale = str_starts_with(strtolower($locale), 'de') ? 'de' : 'en';
+        $basePath = plugin_path('minecrafttoolkit', 'lang/' . $targetLocale);
+
+        foreach (glob($basePath . '/*.php') ?: [] as $file) {
+            $group = basename($file, '.php');
+            $lines = require $file;
+            if (is_array($lines)) {
+                Lang::addLines($this->flattenTranslations($lines, $group), $locale, 'minecrafttoolkit');
+            }
+        }
+    }
+
+    /** @param array<string, mixed> $lines */
+    private function flattenTranslations(array $lines, string $prefix): array
+    {
+        $flattened = [];
+
+        foreach ($lines as $key => $value) {
+            $fullKey = $prefix . '.' . $key;
+            if (is_array($value)) {
+                $flattened += $this->flattenTranslations($value, $fullKey);
+                continue;
+            }
+
+            $flattened[$fullKey] = $value;
+        }
+
+        return $flattened;
+    }
 }

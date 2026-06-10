@@ -82,11 +82,11 @@ class MinecraftOverviewPage extends Page
 
     public static function getNavigationLabel(): string
     {
-        return 'Minecraft Overview';
+        return trans('minecrafttoolkit::strings.navigation.overview');
     }
 
     public function getTitle(): string
     {
-        return 'Minecraft Overview';
+        return trans('minecrafttoolkit::strings.navigation.overview');
     }
 }

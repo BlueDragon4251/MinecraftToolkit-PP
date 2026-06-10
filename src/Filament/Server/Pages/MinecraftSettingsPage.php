@@ -89,12 +89,12 @@ class MinecraftSettingsPage extends Page implements HasSchemas
 
     public static function getNavigationLabel(): string
     {
-        return 'Minecraft Settings';
+        return trans('minecrafttoolkit::strings.navigation.settings');
     }
 
     public function getTitle(): string
     {
-        return 'Minecraft Settings';
+        return trans('minecrafttoolkit::strings.navigation.settings');
     }
 
     protected function getFormStatePath(): ?string
@@ -106,24 +106,24 @@ class MinecraftSettingsPage extends Page implements HasSchemas
     {
         return [
             Section::make('server.properties')
-                ->description('Nur die angezeigten Werte werden geändert. Der Server muss gestoppt sein.')
+                ->description(trans('minecrafttoolkit::strings.settings_page.description'))
                 ->columns(2)
                 ->schema([
                     TextInput::make('motd')->label('MOTD')->required()->maxLength(255),
-                    TextInput::make('max_players')->label('Maximale Spieler')->numeric()->minValue(1)->required(),
-                    TextInput::make('view_distance')->label('Sichtweite')->numeric()->minValue(2)->maxValue(32)->required(),
-                    TextInput::make('simulation_distance')->label('Simulationsweite')->numeric()->minValue(2)->maxValue(32)->required(),
+                    TextInput::make('max_players')->label(trans('minecrafttoolkit::strings.setup.max_players'))->numeric()->minValue(1)->required(),
+                    TextInput::make('view_distance')->label(trans('minecrafttoolkit::strings.setup.view_distance'))->numeric()->minValue(2)->maxValue(32)->required(),
+                    TextInput::make('simulation_distance')->label(trans('minecrafttoolkit::strings.setup.simulation_distance'))->numeric()->minValue(2)->maxValue(32)->required(),
                     Toggle::make('online_mode')->label('Online Mode'),
                     Toggle::make('whitelist')->label('Whitelist'),
                     Toggle::make('pvp')->label('PVP'),
-                    Toggle::make('allow_flight')->label('Fliegen erlauben'),
+                    Toggle::make('allow_flight')->label(trans('minecrafttoolkit::strings.setup.allow_flight')),
                 ]),
             Section::make('Crossplay')
-                ->description('Geyser und Floodgate werden als geschützte Systempakete installiert. Der Server muss gestoppt sein.')
+                ->description(trans('minecrafttoolkit::strings.settings_page.crossplay_desc'))
                 ->visible(fn (): bool => $this->supportsCrossplay())
                 ->schema([
                     Select::make('bedrock_allocation_id')
-                        ->label('Bedrock-Port Allocation')
+                        ->label(trans('minecrafttoolkit::strings.setup.bedrock_allocation'))
                         ->options(fn (): array => $this->bedrockAllocationOptions()),
                 ]),
         ];
@@ -164,11 +164,11 @@ class MinecraftSettingsPage extends Page implements HasSchemas
             $files->write($server, '/server.properties', app(MinecraftPropertiesService::class)->patch($current, $changes));
             $setup->fill(collect($data)->except('bedrock_allocation_id')->all())->save();
 
-            Notification::make()->title('Minecraft-Einstellungen gespeichert')->success()->send();
+            Notification::make()->title(trans('minecrafttoolkit::strings.settings_page.saved'))->success()->send();
         } catch (\Throwable $exception) {
             report($exception);
             Notification::make()
-                ->title('Einstellungen konnten nicht gespeichert werden')
+                ->title(trans('minecrafttoolkit::strings.settings_page.save_failed'))
                 ->body($exception instanceof MinecraftToolkitException
                     ? $exception->getMessage()
                     : 'Wings oder die Serverdatei ist derzeit nicht erreichbar.')
@@ -188,7 +188,7 @@ class MinecraftSettingsPage extends Page implements HasSchemas
             );
 
             Notification::make()
-                ->title('Crossplay wurde installiert')
+                ->title(trans('minecrafttoolkit::strings.settings_page.crossplay_installed'))
                 ->body($configured
                     ? 'Geyser verwendet Floodgate und den ausgewählten Bedrock-Port.'
                     : 'Starte den Server einmal und klicke danach auf „Crossplay-Konfiguration anwenden“.')
@@ -205,7 +205,7 @@ class MinecraftSettingsPage extends Page implements HasSchemas
         try {
             app(MinecraftCrossplayService::class)->applyConfig($this->server(), $this->setup());
             Notification::make()
-                ->title('Crossplay-Konfiguration angewendet')
+                ->title(trans('minecrafttoolkit::strings.settings_page.crossplay_config_applied'))
                 ->body('Geyser verwendet jetzt Floodgate und den ausgewählten Bedrock-Port.')
                 ->success()
                 ->send();
@@ -275,7 +275,7 @@ class MinecraftSettingsPage extends Page implements HasSchemas
     private function crossplayError(MinecraftToolkitException $exception): void
     {
         Notification::make()
-            ->title('Crossplay-Aktion fehlgeschlagen')
+            ->title(trans('minecrafttoolkit::strings.settings_page.crossplay_failed'))
             ->body($exception->getMessage())
             ->danger()
             ->persistent()

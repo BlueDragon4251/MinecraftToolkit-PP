@@ -94,12 +94,12 @@ class MinecraftVersionChangePage extends Page implements HasSchemas
 
     public static function getNavigationLabel(): string
     {
-        return 'Minecraft-Version ändern';
+        return trans('minecrafttoolkit::strings.navigation.version_change');
     }
 
     public function getTitle(): string
     {
-        return 'Minecraft-Version ändern';
+        return trans('minecrafttoolkit::strings.navigation.version_change');
     }
 
     protected function getFormStatePath(): ?string
@@ -120,7 +120,7 @@ class MinecraftVersionChangePage extends Page implements HasSchemas
                 ->columns(2)
                 ->schema([
                     Select::make('minecraft_version')
-                        ->label('Neue Minecraft-Version')
+                        ->label(trans('minecrafttoolkit::strings.version_change.new_version'))
                         ->options(fn (): array => app(MinecraftSoftwareService::class)
                             ->versionOptions($this->setup()->software))
                         ->disableOptionWhen(fn (string $value): bool => $value === $this->setup()->minecraft_version)
@@ -134,7 +134,7 @@ class MinecraftVersionChangePage extends Page implements HasSchemas
                         })
                         ->required(),
                     Select::make('loader_version')
-                        ->label('Neue Loader-Version')
+                        ->label(trans('minecrafttoolkit::strings.version_change.new_loader_version'))
                         ->options(fn (Get $get): array => app(MinecraftSoftwareService::class)->loaderVersionOptions(
                             $this->setup()->software,
                             (string) $get('minecraft_version')
@@ -157,10 +157,10 @@ class MinecraftVersionChangePage extends Page implements HasSchemas
                             true
                         )),
                     Toggle::make('confirm_remove')
-                        ->label('Inkompatible und unbekannte Pakete sichern und deaktivieren')
+                        ->label(trans('minecrafttoolkit::strings.version_change.disable_incompatible'))
                         ->visible(fn (): bool => ($this->report['blocking'] ?? 0) > 0),
                     Toggle::make('confirm_risk')
-                        ->label('Ich akzeptiere, dass der Server danach möglicherweise nicht startet')
+                        ->label(trans('minecrafttoolkit::strings.version_change.accept_risk'))
                         ->visible(fn (): bool => ($this->report['blocking'] ?? 0) > 0),
                 ]),
         ];
@@ -177,7 +177,7 @@ class MinecraftVersionChangePage extends Page implements HasSchemas
                 is_string($state['loader_version'] ?? null) ? $state['loader_version'] : null
             );
             Notification::make()
-                ->title('Kompatibilitätsprüfung abgeschlossen')
+                ->title(trans('minecrafttoolkit::strings.version_change.check_complete'))
                 ->body(($this->report['blocking'] ?? 0) > 0
                     ? "{$this->report['blocking']} Pakete blockieren einen sicheren Wechsel."
                     : 'Für alle verwalteten Pakete wurde eine kompatible Strategie gefunden.')
@@ -232,7 +232,7 @@ class MinecraftVersionChangePage extends Page implements HasSchemas
             );
 
             Notification::make()
-                ->title("Minecraft {$result['setup']->minecraft_version} wurde installiert")
+                ->title(trans('minecrafttoolkit::strings.version_change.installed', ['version' => $result['setup']->minecraft_version]))
                 ->body("Pakete aktualisiert: {$result['updated']}, gesichert: {$result['removed']}, fehlgeschlagen: {$result['failed']}")
                 ->status($result['failed'] > 0 ? 'warning' : 'success')
                 ->persistent($result['failed'] > 0)
