@@ -6,14 +6,20 @@ The changelog is maintained under the current release version. New changes are a
 
 This project is source-available, not open source. See [`LICENSE`](./LICENSE) for usage rights.
 
-## [1.2.0] - Unreleased
-
-### Note 
-
-- Temporarily disabled CurseForge by default for public builds; administrators can still enable it with a private proxy or a private direct API key.
-- Removed the default active CurseForge proxy URL and proxy secret from runtime configuration so normal installs only use Modrinth unless CurseForge is explicitly configured.
+## [1.2.1] - Unreleased
+- Fixed Vanilla Bedrock setup downloads by downloading the official Bedrock ZIP through the panel first instead of using the Wings pull endpoint, avoiding daemon-side HTTP 500 failures for minecraft.net downloads.
+- Fixed Vanilla Bedrock `latest` setup by using the configured official Bedrock Linux ZIP fallback when the Minecraft download page cannot be parsed.
 
 ### Added
+
+- Added clearer CurseForge proxy secret rotation support and 401 troubleshooting notes.
+- Added broader Forge Minecraft version discovery by merging Maven metadata with Forge promotion metadata, so older Forge Minecraft versions are not hidden when Maven metadata is incomplete or filtered.
+
+- Added stricter BlueIT CurseForge request hardening with Toolkit marker header, nonce, user-agent binding, and HMAC signatures that no longer send the shared secret as a plain request header.
+- Added hidden/default CurseForge settings behavior so service URL, shared secret, and direct API key fields stay empty in the panel unless an administrator intentionally overrides them.
+
+- Added signed CurseForge proxy request headers with client id, timestamp, and HMAC signature support.
+- Added Toolkit proxy client configuration for the BlueIT CurseForge backend.
 
 - Added paged `server.properties` editing in Minecraft Settings, including standard Java properties plus a full raw editor for unknown or newer values.
 - Added a Java class-version safety check for downloaded JAR files. Public builds default to Java 21 / class version 65 and reject newer JARs before writing them to the server.
@@ -67,11 +73,22 @@ This project is source-available, not open source. See [`LICENSE`](./LICENSE) fo
 
 ### Changed
 
+- Changed Vanilla Bedrock version loading so the setup wizard always offers a `Latest official Bedrock server` option when the Minecraft download page cannot be parsed, and supports optional direct Bedrock download URL overrides.
+
+- Changed setup package selection to support mixed providers: Modrinth and CurseForge selections now stay selected when switching sources or changing the search text, and setup installs the combined selection.
+
+- Changed CurseForge settings text to show only the BlueIT service host/status instead of the internal backend path.
+- Changed the default Toolkit user agent to the BlueIT Toolkit identifier required by the hardened backend.
+
+- Updated CurseForge proxy documentation for the official CurseForge REST API, allowlisted endpoints, and server-side `x-api-key` handling.
+- Kept CurseForge enabled through the BlueIT proxy while preventing the real API key from being included in the public plugin.
+
+- Re-enabled CurseForge by default through the BlueIT Toolkit proxy now that the proxy backend is configured.
+- Restored the default CurseForge proxy URL and proxy token while keeping direct API keys out of the public plugin source.
+
 - Changed the setup Mods/Plugins step back to the same card-style package browser used by the installer, without rendering it outside the Mods/Plugins wizard step.
 - Changed Geyser configuration patching to update the modern `java.auth-type` and `motd` sections instead of only adding legacy/unused keys.
 
-- Temporarily disabled CurseForge by default for public builds; administrators can still enable it with a private proxy or a private direct API key.
-- Removed the default active CurseForge proxy URL and proxy secret from runtime configuration so normal installs only use Modrinth unless CurseForge is explicitly configured.
 - Changed the setup wizard defaults so no server software is preselected before the user chooses one.
 
 - Marked the plugin as source-available, not open source.
@@ -82,8 +99,15 @@ This project is source-available, not open source. See [`LICENSE`](./LICENSE) fo
 - Updated README with setup package installation, popular package browsing, MOTD formatter, crossplay behavior, language behavior, installation notes, and changelog reference.
 - Kept the plugin language handling isolated to Minecraft Toolkit and did not change the global Pelican locale.
 - Set the plugin version to `1.2.0` as requested for the next package build.
+- Set the plugin version to `1.2.1` as requested for the CurseForge-enabled package build.
 
 ### Fixed
+
+- Fixed Minecraft setup failing with `Call to undefined method MinecraftServerFileService::extractMaxClassMajorVersionFromJar()` by restoring the JAR class-version scanner and Java compatibility guard.
+
+- Fixed Forge loader version discovery for older Minecraft versions by merging Maven loader builds with Forge promotion metadata and refreshing the loader-version cache key.
+
+- Fixed CurseForge setup browsing showing a generic empty result when the proxy request fails; backend failures are now logged and surfaced more clearly during setup package loading.
 
 - Fixed setup package selection showing as an old dropdown instead of the installer-style package browser.
 - Fixed setup installs accepting plugin JARs that require a newer Java runtime than the configured server Java version can load.

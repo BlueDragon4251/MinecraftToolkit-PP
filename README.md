@@ -6,7 +6,7 @@ Minecraft Toolkit is a Pelican Panel plugin for setting up and managing Minecraf
 
 See [`CHANGELOG.md`](./CHANGELOG.md) for version history and notable changes.
 
-Current version: `1.2.0`.
+Current version: `1.2.1`.
 
 ## License and usage rights
 
@@ -14,21 +14,21 @@ Minecraft Toolkit is **source-available, not open source**. You may download and
 
 Official distribution is only allowed through channels approved by Nico Egger / BlueIT, such as the official GitHub repository and the Pelican Hub. See [`LICENSE`](./LICENSE) for the full terms.
 
-No CurseForge API key is included in the public plugin source. CurseForge is temporarily disabled by default in public builds and can be enabled by administrators with a private backend proxy or a private local API key.
+No CurseForge API key is included in the public plugin source. CurseForge is enabled through the BlueIT service by default, so normal users can browse supported CurseForge packages without seeing backend API details in the panel.
 
 ## Features
 
 - Guided setup for Vanilla Java, Vanilla Bedrock, Paper, Folia, Purpur, Fabric, Forge, and NeoForge
 - Automatic Minecraft and loader version selection from official sources
 - Generation of `eula.txt` and `server.properties`
-- Optional plugin/mod selection during setup; selected packages are installed immediately after setup completes
+- Optional plugin/mod selection during setup; selected packages from Modrinth and CurseForge can be mixed and are installed immediately after setup completes
 - Installer opens with popular compatible packages before searching. The setup package browser is shown only inside the Mods/Plugins setup step and can load popular packages from the selected enabled source.
 - MOTD formatter helper for Minecraft color and style codes
 - Primary server port taken from the Pelican allocation
 - Optional validated 64x64 PNG server icon
 - Modrinth plugin installation for Paper, Purpur, and Folia
 - Modrinth mod installation for Fabric, Forge, and NeoForge
-- Optional CurseForge plugin and mod installation through a private Toolkit backend proxy or optional private local API key
+- Optional CurseForge plugin and mod installation through the BlueIT service or an optional private local API key
 - Required dependency auto-installation and optional dependency review
 - Optional Geyser and Floodgate crossplay for Paper and Purpur, including Bedrock port, Floodgate auth-type, and Geyser MOTD patching
 - Update checks for managed Modrinth, Geyser, and Floodgate packages
@@ -85,7 +85,7 @@ The directory name must remain `minecrafttoolkit`, because it must match the plu
 7. Configure the MOTD, world name, player limit, and gameplay settings.
 8. Optionally upload a 64x64 PNG server icon.
 9. For Paper or Purpur, optionally enable crossplay and select a Bedrock allocation. Folia intentionally does not expose the crossplay switch because Paper plugin compatibility is not guaranteed.
-10. Optionally select multiple compatible plugins or mods that should be installed directly after setup.
+10. Optionally select multiple compatible plugins or mods that should be installed directly after setup. You can switch between Modrinth and CurseForge without losing the previous selections, so mixed-provider setups are supported.
 11. Review the setup and start it.
 
 Existing target files are moved to:
@@ -94,7 +94,7 @@ Existing target files are moved to:
 /.minecraft-toolkit/backups/YYYY-MM-DD-HH-mm-ss/
 ```
 
-Forge and NeoForge use their official `--installServer` flow during the first server start. Vanilla Bedrock downloads the official Linux Bedrock Dedicated Server ZIP and extracts it during the first server start. That first launch creates `run.sh` and the loader libraries and can take several minutes.
+Forge loader versions are resolved from both Maven metadata and Forge promotion metadata, so older Minecraft versions can still show their matching Forge builds when only recommended/latest metadata is exposed. Forge and NeoForge use their official `--installServer` flow during the first server start. Vanilla Bedrock downloads the official Linux Bedrock Dedicated Server ZIP and extracts it during the first server start. That first launch creates `run.sh` and the loader libraries and can take several minutes.
 
 ## Supported Server Software
 
@@ -124,7 +124,7 @@ Search results are filtered by the configured Minecraft version, server loader, 
 
 Required dependencies reported by Modrinth or CurseForge are installed automatically before the selected package. Optional dependencies are shown for review but are not installed automatically.
 
-CurseForge is temporarily disabled by default in public builds. Administrators can enable it by setting `MINECRAFT_TOOLKIT_CURSEFORGE_ENABLED=true` and configuring either a private Toolkit-compatible backend proxy or a private direct CurseForge API key. If CurseForge is disabled or no valid proxy/key is available, CurseForge is hidden from server users while Modrinth continues to work.
+CurseForge is enabled by default through the BlueIT service. The real CurseForge API key stays outside the plugin source. Administrators can still override the backend connection or use a private direct API key in self-hosted/private installs. If CurseForge is disabled or no valid backend/key is available, CurseForge is hidden from server users while Modrinth continues to work.
 
 CurseForge does not consistently expose whether a mod is client-only or server-compatible. The Toolkit shows a warning for ambiguous CurseForge mods and requires the user to verify the project description before installation.
 
@@ -222,20 +222,25 @@ Administrators can configure Minecraft Toolkit from the Pelican plugin settings 
 | `MINECRAFT_TOOLKIT_ADMINS_ONLY` | `false` | Restricts modifying Toolkit actions to administrators |
 | `MINECRAFT_TOOLKIT_BACKUP_BEFORE_OVERWRITE` | `true` | Backs up setup target files before replacement |
 | `MINECRAFT_TOOLKIT_MODRINTH_ENABLED` | `true` | Enables Modrinth search and installation |
-| `MINECRAFT_TOOLKIT_CURSEFORGE_ENABLED` | `false` | Enables CurseForge when a private proxy or private direct key is configured |
-| `MINECRAFT_TOOLKIT_CURSEFORGE_PROXY_URL` | empty | Optional private Toolkit-compatible CurseForge proxy URL |
-| `MINECRAFT_TOOLKIT_CURSEFORGE_PROXY_SECRET` | empty | Optional proxy secret for private Toolkit-compatible proxy installs |
+| `MINECRAFT_TOOLKIT_CURSEFORGE_ENABLED` | `true` | Enables CurseForge package browsing and installation |
+| `MINECRAFT_TOOLKIT_CURSEFORGE_PROXY_URL` | internal default | Optional override for a private CurseForge bridge. Leave empty to use the built-in default. |
+| `MINECRAFT_TOOLKIT_CURSEFORGE_PROXY_SECRET` | internal default | Optional override for a private bridge secret. The value is not shown in the panel. Public builds internally match the BlueIT default proxy secret. |
+| `MINECRAFT_TOOLKIT_CURSEFORGE_PROXY_CLIENT_ID` | `minecraft-toolkit` | Client identifier sent to the Toolkit proxy |
+| `MINECRAFT_TOOLKIT_CURSEFORGE_PROXY_SIGNED_REQUESTS` | `true` | Sends timestamped HMAC headers to the Toolkit proxy |
 | `MINECRAFT_TOOLKIT_CURSEFORGE_API_KEY` | empty | Optional private direct CurseForge API key sent through the `x-api-key` request header |
 | `MINECRAFT_TOOLKIT_UPDATER_ENABLED` | `true` | Enables the package updater page |
 | `MINECRAFT_TOOLKIT_VERSION_CHANGE_ENABLED` | `true` | Enables compatibility checks and Minecraft version changes |
 | `MINECRAFT_TOOLKIT_VERSION_CHANGE_USERS_ENABLED` | `true` | Allows non-admin server owners and permitted subusers to change versions |
 | `MINECRAFT_TOOLKIT_CROSSPLAY_ENABLED` | `true` | Enables Geyser/Floodgate support |
 | `MINECRAFT_TOOLKIT_BEDROCK_PORT_REQUIRED` | `true` | Requires a separate Bedrock allocation |
+| `MINECRAFT_TOOLKIT_BEDROCK_DOWNLOAD_URL` | empty | Optional direct Linux Bedrock server ZIP URL override when the official download page cannot be parsed |
+| `MINECRAFT_TOOLKIT_BEDROCK_DOWNLOAD_VERSION` | empty | Version label for the direct Bedrock download URL if it cannot be extracted from the file name |
+| `MINECRAFT_TOOLKIT_BEDROCK_FALLBACK_VERSIONS` | `latest` | Fallback Bedrock setup versions shown when live lookup fails. Use comma-separated explicit versions for direct version URLs. |
 | `MINECRAFT_TOOLKIT_HTTP_TIMEOUT` | `20` | Metadata API timeout in seconds |
 | `MINECRAFT_TOOLKIT_DOWNLOAD_TIMEOUT` | `300` | Package download timeout in seconds |
 | `MINECRAFT_TOOLKIT_MAX_ICON_BYTES` | `2097152` | Maximum server icon size |
 | `MINECRAFT_TOOLKIT_MAX_PACKAGE_BYTES` | `104857600` | Maximum package size |
-| `MINECRAFT_TOOLKIT_USER_AGENT` | `Pelican-Minecraft-Toolkit/1.0` | User-Agent for external requests |
+| `MINECRAFT_TOOLKIT_USER_AGENT` | `BlueIT-MinecraftToolkit/1.2.1` | User-Agent for external requests |
 
 After changing environment values manually, clear cached configuration:
 
@@ -276,9 +281,10 @@ For Paper/Purpur crossplay, applying the Crossplay configuration also patches Ge
 - **Fabric, Forge, or NeoForge setup is denied:** grant startup-update permission or run the setup as the server owner or an administrator.
 - **Forge or NeoForge does not start:** inspect the first-start console, verify the container has the correct Java version, and confirm `/run.sh` was created.
 - **No Modrinth results:** verify the selected Minecraft version and loader are supported by the project and that the Panel host can reach `api.modrinth.com`.
-- **CurseForge is missing:** CurseForge is disabled by default in public builds. Enable it with a private Toolkit-compatible proxy or a private local API key. Public plugin builds do not ship with a CurseForge API key.
+- **CurseForge is missing:** Verify `MINECRAFT_TOOLKIT_CURSEFORGE_ENABLED=true` and that either the BlueIT service or a private direct API key is configured. Public plugin builds do not ship with a CurseForge API key. If the BlueIT proxy returns 401, verify that `CURSEFORGE_PROXY_SECRET` on Vercel matches the Toolkit default or is listed in `CURSEFORGE_PROXY_SECRETS`.
 - **CurseForge has no download URL:** the project author disabled third-party API downloads; that file cannot be installed automatically.
 - **Crossplay config is missing:** start Paper/Purpur once, stop it, and apply the config from Minecraft Settings.
+- **Vanilla Bedrock says no versions are available:** clear Laravel/plugin caches. If the official Minecraft page is temporarily blocked or changed, the wizard falls back to `Latest official Bedrock server`. For locked-down hosts, set `MINECRAFT_TOOLKIT_BEDROCK_DOWNLOAD_URL` to the direct Linux Bedrock ZIP URL.
 - **Bedrock players cannot connect:** verify the selected allocation permits UDP traffic and the node firewall exposes that port.
 - **Update failed:** inspect `/.minecraft-toolkit/backups/` and the Laravel log. The updater attempts to restore the previous file automatically.
 - **Version change is blocked:** review incompatible and unknown packages, then either secure and disable them or explicitly use the risk option.
@@ -288,36 +294,19 @@ For Paper/Purpur crossplay, applying the Crossplay configuration also patches Ge
 Logs for setup, installs, crossplay, checks, and updates are stored per server and shown on the Minecraft Overview page.
 
 
-## CurseForge API handling
+## CurseForge backend handling
 
-CurseForge is temporarily disabled by default in public builds. Modrinth remains enabled and usable without extra configuration.
+CurseForge uses the BlueIT service by default. The panel settings intentionally keep service URL and secret fields empty, because the stored defaults are used internally unless an administrator explicitly enters private override values.
 
-Administrators who already have valid CurseForge access can enable CurseForge with either a private Toolkit-compatible proxy or a private direct API key.
+Manual browser navigation to the BlueIT backend returns to the website start page. Non-Toolkit HTTP clients are rejected before any CurseForge request is forwarded. Toolkit requests include a dedicated client marker, client id, timestamp, nonce, custom user agent, and HMAC signature. This keeps casual/manual access away from the backend while the real CurseForge API key remains server-side.
 
-Private proxy example:
-
-```env
-MINECRAFT_TOOLKIT_CURSEFORGE_ENABLED=true
-MINECRAFT_TOOLKIT_CURSEFORGE_PROXY_URL=https://your-vercel-domain.vercel.app/api/curseforge/proxy
-MINECRAFT_TOOLKIT_CURSEFORGE_PROXY_SECRET=your_proxy_secret
-```
-
-Your private proxy backend must have:
+Advanced private installs can skip the default service and set their own private direct API key:
 
 ```env
-CURSEFORGE_API_KEY=your_real_curseforge_api_key
-CURSEFORGE_PROXY_SECRET=your_proxy_secret
-```
-
-Advanced private installs can skip the proxy and set:
-
-```env
-MINECRAFT_TOOLKIT_CURSEFORGE_ENABLED=true
 MINECRAFT_TOOLKIT_CURSEFORGE_API_KEY=your_private_key
 ```
 
-Do not ship CurseForge API keys inside public plugin builds. If CurseForge is disabled or no private proxy/key is configured, CurseForge disables itself safely and Modrinth continues to work.
-
+Do not ship CurseForge API keys inside public plugin builds. If CurseForge is disabled or no backend/key is configured, CurseForge disables itself safely and Modrinth continues to work.
 
 ## Languages
 
@@ -341,3 +330,19 @@ Minecraft Toolkit checks downloaded plugin/mod JARs before writing them to the s
 ## Crossplay configuration note
 
 The Geyser configuration patcher updates the modern Geyser config layout, including `bedrock.port`, `java.auth-type`, `motd.primary-motd`, `motd.secondary-motd`, and `motd.passthrough-motd`.
+
+### Bedrock Dedicated Server fallback
+
+The Toolkit uses the official Minecraft Bedrock Dedicated Server Linux download URL. If the public Minecraft download page changes its HTML or blocks server-side scraping, the plugin now falls back to the built-in official URL and can also be overridden through `.env`:
+
+```env
+MINECRAFT_TOOLKIT_BEDROCK_DOWNLOAD_URL=https://www.minecraft.net/bedrockdedicatedserver/bin-linux/bedrock-server-1.26.23.1.zip
+MINECRAFT_TOOLKIT_BEDROCK_DOWNLOAD_VERSION=1.26.23.1
+MINECRAFT_TOOLKIT_BEDROCK_FALLBACK_VERSIONS=latest,1.26.23.1
+```
+
+Selecting `latest` uses the configured official URL. Selecting a concrete Bedrock version builds the official Mojang download URL for that exact version.
+
+### Bedrock ZIP downloads
+
+Vanilla Bedrock ZIP files are downloaded by the Panel first and then written into the server files. This avoids daemon-side pull failures when `minecraft.net` rejects or errors on Wings' background download request.

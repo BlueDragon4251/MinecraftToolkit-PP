@@ -59,17 +59,53 @@ class MinecraftServerFileService
     /** @param string[] $allowedExtensions */
     public function pullFile(Server $server, string $url, string $fileName, array $allowedExtensions = ['jar']): void
     {
+        $this->assertFileName($fileName, $allowedExtensions);
         $this->assertDownloadUrl($url);
-        $extension = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
-        if (!preg_match('/^[a-zA-Z0-9._-]+$/', $fileName)
-            || !in_array($extension, $allowedExtensions, true)) {
-            throw new MinecraftToolkitException('Der Zieldateiname für den Download ist ungültig.');
-        }
 
         $this->repository($server)->pull($url, '/', [
             'filename' => $fileName,
             'foreground' => true,
         ])->throw();
+    }
+
+    /** @param string[] $allowedExtensions */
+    public function downloadFile(Server $server, string $url, string $fileName, array $allowedExtensions = ['jar']): array
+    {
+        $this->assertFileName($fileName, $allowedExtensions);
+        $this->assertDownloadUrl($url);
+
+        $response = Http::withUserAgent((string) config('minecrafttoolkit.user_agent'))
+            ->withHeaders([
+                'Accept' => 'application/zip,application/octet-stream,*/*',
+            ])
+            ->connectTimeout(10)
+            ->timeout((int) config('minecrafttoolkit.download_timeout', 300))
+            ->get($url)
+            ->throw();
+
+        $contents = $response->body();
+        if ($contents === '' || strlen($contents) > (int) config('minecrafttoolkit.max_package_bytes', 104857600)) {
+            throw new MinecraftToolkitException('Der Paketdownload ist leer oder überschreitet das Größenlimit.');
+        }
+
+        $this->write($server, '/' . $fileName, $contents);
+
+        return [
+            'sha1' => hash('sha1', $contents),
+            'sha256' => hash('sha256', $contents),
+            'sha512' => hash('sha512', $contents),
+            'size' => strlen($contents),
+        ];
+    }
+
+    /** @param string[] $allowedExtensions */
+    private function assertFileName(string $fileName, array $allowedExtensions): void
+    {
+        $extension = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
+        if (!preg_match('/^[a-zA-Z0-9._-]+$/', $fileName)
+            || !in_array($extension, $allowedExtensions, true)) {
+            throw new MinecraftToolkitException('Der Zieldateiname für den Download ist ungültig.');
+        }
     }
 
     /** @param array<string, string> $hashes */
@@ -186,6 +222,88 @@ class MinecraftServerFileService
             }
             @unlink($tmp);
         }
+    }
+
+
+
+    private function extractMaxClassMajorVersionFromJar(string $contents): ?int
+    {
+        if (!class_exists(\ZipArchive::class)) {
+            return null;
+        }
+
+        $tmp = tempnam(sys_get_temp_dir(), 'mtk-class-');
+        if ($tmp === false) {
+            return null;
+        }
+
+        try {
+            file_put_contents($tmp, $contents);
+            $zip = new \ZipArchive();
+            if ($zip->open($tmp) !== true) {
+                return null;
+            }
+
+            $maxMajor = null;
+            for ($index = 0; $index < $zip->numFiles; $index++) {
+                $stat = $zip->statIndex($index);
+                if (!is_array($stat)) {
+                    continue;
+                }
+
+                $name = (string) ($stat['name'] ?? '');
+                if (!str_ends_with($name, '.class')) {
+                    continue;
+                }
+
+                $stream = $zip->getStream($name);
+                if ($stream === false) {
+                    continue;
+                }
+
+                $header = fread($stream, 8);
+                fclose($stream);
+
+                if (!is_string($header) || strlen($header) < 8) {
+                    continue;
+                }
+
+                $data = unpack('Nmagic/nminor/nmajor', $header);
+                if (!is_array($data) || ($data['magic'] ?? null) !== 0xCAFEBABE) {
+                    continue;
+                }
+
+                $major = (int) ($data['major'] ?? 0);
+                if ($major > 0 && ($maxMajor === null || $major > $maxMajor)) {
+                    $maxMajor = $major;
+                }
+            }
+
+            return $maxMajor;
+        } finally {
+            if (isset($zip) && $zip instanceof \ZipArchive) {
+                $zip->close();
+            }
+            @unlink($tmp);
+        }
+    }
+
+    private function assertJavaClassVersionAllowed(?int $classMajorVersion): void
+    {
+        if ($classMajorVersion === null) {
+            return;
+        }
+
+        $max = (int) config('minecrafttoolkit.java_class_version_max', 65);
+        if ($max <= 0 || $classMajorVersion <= $max) {
+            return;
+        }
+
+        throw new MinecraftToolkitException(sprintf(
+            'Diese JAR benötigt eine neuere Java-Version (Class-Version %d). Auf diesem Panel ist maximal Class-Version %d erlaubt. Verwende eine ältere Paketversion oder erhöhe MINECRAFT_TOOLKIT_JAVA_CLASS_VERSION_MAX passend zur Server-Java-Version.',
+            $classMajorVersion,
+            $max
+        ));
     }
 
     public function backupIfPresent(Server $server, string $path): ?string

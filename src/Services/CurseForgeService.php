@@ -16,8 +16,6 @@ class CurseForgeService
 
     private const API = 'https://api.curseforge.com/v1';
 
-    private const PROXY_HEADER = 'X-Minecraft-Toolkit-Proxy-Secret';
-
     private const MINECRAFT_GAME_ID = 432;
 
     private const BUKKIT_CLASS_ID = 5;
@@ -338,11 +336,7 @@ class CurseForgeService
      */
     private function proxyRequest(string $path, array $query = []): array
     {
-        $headers = [];
-        $secret = trim((string) config('minecrafttoolkit.curseforge_proxy_secret', ''));
-        if ($secret !== '') {
-            $headers[self::PROXY_HEADER] = $secret;
-        }
+        $headers = $this->proxyHeaders($path);
 
         return Http::acceptJson()
             ->withHeaders($headers)
@@ -352,6 +346,34 @@ class CurseForgeService
             ->get($this->proxyUrl(), ['path' => $path] + $query)
             ->throw()
             ->json();
+    }
+
+
+    /** @return array<string, string> */
+    private function proxyHeaders(string $path): array
+    {
+        $secret = trim((string) config('minecrafttoolkit.curseforge_proxy_secret', ''));
+        $clientId = trim((string) config('minecrafttoolkit.curseforge_proxy_client_id', 'minecraft-toolkit'));
+        $userAgent = (string) config('minecrafttoolkit.user_agent');
+        $timestamp = (string) time();
+        $nonce = bin2hex(random_bytes(16));
+
+        $headers = [
+            'X-BlueIT-Toolkit-Request' => 'v1',
+            'X-Minecraft-Toolkit-Client' => $clientId,
+            'X-Minecraft-Toolkit-Timestamp' => $timestamp,
+            'X-Minecraft-Toolkit-Nonce' => $nonce,
+        ];
+
+        if ($secret !== '' && (bool) config('minecrafttoolkit.curseforge_proxy_signed_requests', true)) {
+            $headers['X-Minecraft-Toolkit-Signature'] = hash_hmac(
+                'sha256',
+                "GET\n{$path}\n{$timestamp}\n{$clientId}\n{$nonce}\n{$userAgent}",
+                $secret
+            );
+        }
+
+        return $headers;
     }
 
     /** @param array<string, scalar> $query

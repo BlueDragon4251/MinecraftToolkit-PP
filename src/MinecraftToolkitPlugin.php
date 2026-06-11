@@ -55,27 +55,36 @@ class MinecraftToolkitPlugin implements HasPluginSettings, Plugin
                 ->helperText(trans('minecrafttoolkit::strings.settings.curseforge_enabled_help')),
             Placeholder::make('curseforge_key_status')
                 ->label(trans('minecrafttoolkit::strings.settings.curseforge_key_status'))
-                ->content(fn (): string => app(CurseForgeApiKeyProvider::class)->hasKey()
-                    ? trans('minecrafttoolkit::strings.settings.direct_key_available', ['source' => app(CurseForgeApiKeyProvider::class)->source() ?? trans('minecrafttoolkit::strings.settings.unknown_source')])
-                    : ((string) config('minecrafttoolkit.curseforge_proxy_url', '') !== ''
-                        ? trans('minecrafttoolkit::strings.settings.proxy_active', ['url' => (string) config('minecrafttoolkit.curseforge_proxy_url')])
-                         : trans('minecrafttoolkit::strings.settings.no_proxy_no_key'))) ,
+                ->content(function (): string {
+                    if (app(CurseForgeApiKeyProvider::class)->hasKey()) {
+                        return trans('minecrafttoolkit::strings.settings.direct_key_available');
+                    }
+
+                    $proxyHost = parse_url((string) config('minecrafttoolkit.curseforge_proxy_url', ''), PHP_URL_HOST);
+
+                    return is_string($proxyHost) && $proxyHost !== ''
+                        ? trans('minecrafttoolkit::strings.settings.proxy_active', ['host' => $proxyHost])
+                        : trans('minecrafttoolkit::strings.settings.no_proxy_no_key');
+                }),
             TextInput::make('curseforge_proxy_url')
                 ->label(trans('minecrafttoolkit::strings.settings.proxy_url'))
                 ->url()
-                ->default((string) config('minecrafttoolkit.curseforge_proxy_url', ''))
+                ->default('')
+                ->placeholder(trans('minecrafttoolkit::strings.settings.standard_proxy_placeholder'))
                 ->helperText(trans('minecrafttoolkit::strings.settings.proxy_url_help')),
             TextInput::make('curseforge_proxy_secret')
                 ->label(trans('minecrafttoolkit::strings.settings.proxy_secret'))
                 ->password()
-                ->revealable()
-                ->default((string) config('minecrafttoolkit.curseforge_proxy_secret', ''))
+                ->revealable(false)
+                ->default('')
+                ->placeholder(trans('minecrafttoolkit::strings.settings.standard_secret_placeholder'))
                 ->helperText(trans('minecrafttoolkit::strings.settings.proxy_secret_help')),
             TextInput::make('curseforge_api_key')
                 ->label(trans('minecrafttoolkit::strings.settings.api_key_override'))
                 ->password()
-                ->revealable()
-                ->default((string) config('minecrafttoolkit.curseforge_api_key', ''))
+                ->revealable(false)
+                ->default('')
+                ->placeholder(trans('minecrafttoolkit::strings.settings.optional_override_placeholder'))
                 ->helperText(trans('minecrafttoolkit::strings.settings.api_key_override_help')),
             Toggle::make('updater_enabled')
                 ->label(trans('minecrafttoolkit::strings.settings.updater_enabled'))
@@ -109,15 +118,12 @@ class MinecraftToolkitPlugin implements HasPluginSettings, Plugin
 
     public function saveSettings(array $data): void
     {
-        $this->writeToEnvironment([
+        $values = [
             'MINECRAFT_TOOLKIT_ENABLED' => (bool) ($data['enabled'] ?? false),
             'MINECRAFT_TOOLKIT_ADMINS_ONLY' => (bool) ($data['admins_only'] ?? false),
             'MINECRAFT_TOOLKIT_BACKUP_BEFORE_OVERWRITE' => (bool) ($data['backup_before_overwrite'] ?? true),
             'MINECRAFT_TOOLKIT_MODRINTH_ENABLED' => (bool) ($data['modrinth_enabled'] ?? true),
             'MINECRAFT_TOOLKIT_CURSEFORGE_ENABLED' => (bool) ($data['curseforge_enabled'] ?? false),
-            'MINECRAFT_TOOLKIT_CURSEFORGE_PROXY_URL' => rtrim(trim((string) ($data['curseforge_proxy_url'] ?? '')), '/'),
-            'MINECRAFT_TOOLKIT_CURSEFORGE_PROXY_SECRET' => trim((string) ($data['curseforge_proxy_secret'] ?? '')),
-            'MINECRAFT_TOOLKIT_CURSEFORGE_API_KEY' => trim((string) ($data['curseforge_api_key'] ?? '')),
             'MINECRAFT_TOOLKIT_UPDATER_ENABLED' => (bool) ($data['updater_enabled'] ?? true),
             'MINECRAFT_TOOLKIT_VERSION_CHANGE_ENABLED' => (bool) ($data['version_change_enabled'] ?? true),
             'MINECRAFT_TOOLKIT_VERSION_CHANGE_USERS_ENABLED' => (bool) ($data['version_change_users_enabled'] ?? true),
@@ -125,6 +131,23 @@ class MinecraftToolkitPlugin implements HasPluginSettings, Plugin
             'MINECRAFT_TOOLKIT_BEDROCK_PORT_REQUIRED' => (bool) ($data['bedrock_port_required'] ?? true),
             'MINECRAFT_TOOLKIT_HTTP_TIMEOUT' => max(5, (int) ($data['http_timeout'] ?? 20)),
             'MINECRAFT_TOOLKIT_DOWNLOAD_TIMEOUT' => max(30, (int) ($data['download_timeout'] ?? 300)),
-        ]);
+        ];
+
+        $proxyUrl = rtrim(trim((string) ($data['curseforge_proxy_url'] ?? '')), '/');
+        if ($proxyUrl !== '') {
+            $values['MINECRAFT_TOOLKIT_CURSEFORGE_PROXY_URL'] = $proxyUrl;
+        }
+
+        $proxySecret = trim((string) ($data['curseforge_proxy_secret'] ?? ''));
+        if ($proxySecret !== '') {
+            $values['MINECRAFT_TOOLKIT_CURSEFORGE_PROXY_SECRET'] = $proxySecret;
+        }
+
+        $apiKey = trim((string) ($data['curseforge_api_key'] ?? ''));
+        if ($apiKey !== '') {
+            $values['MINECRAFT_TOOLKIT_CURSEFORGE_API_KEY'] = $apiKey;
+        }
+
+        $this->writeToEnvironment($values);
     }
 }
