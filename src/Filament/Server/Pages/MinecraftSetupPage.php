@@ -303,9 +303,9 @@ class MinecraftSetupPage extends Page implements HasSchemas
                             ->options(fn (): array => $this->setupSourceOptions())
                             ->default('modrinth')
                             ->live()
-                            ->afterStateUpdated(function (Set $set): void {
-                                $set('setup_package_ids', []);
-                                $this->selectedSetupPackageIds = [];
+                            ->afterStateUpdated(function (): void {
+                                // Do not clear selected packages here: users may intentionally mix
+                                // Modrinth and CurseForge packages during setup.
                                 $this->setupPackagePage = 0;
                                 $this->resetSetupPackageBrowser();
                             })
@@ -314,11 +314,10 @@ class MinecraftSetupPage extends Page implements HasSchemas
                             ->label(trans('minecrafttoolkit::strings.installer.search', ['package' => trans('minecrafttoolkit::strings.setup.packages')]))
                             ->placeholder(trans('minecrafttoolkit::strings.installer.project_placeholder'))
                             ->live(onBlur: true)
-                            ->afterStateUpdated(function (?string $state, Set $set): void {
+                            ->afterStateUpdated(function (?string $state): void {
+                                // Search changes must not clear selections from the other provider.
                                 $this->setupPackageQuery = trim((string) $state);
                                 $this->setupPackagePage = 0;
-                                $set('setup_package_ids', []);
-                                $this->selectedSetupPackageIds = [];
                             })
                             ->helperText(trans('minecrafttoolkit::strings.setup.package_browser_help')),
                         Hidden::make('setup_package_ids')
@@ -366,7 +365,7 @@ class MinecraftSetupPage extends Page implements HasSchemas
 
         try {
             $state = $this->form->getState();
-            $state['setup_package_ids'] = array_values(array_filter(array_map('strval', $state['setup_package_ids'] ?? $this->selectedSetupPackageIds)));
+            $state['setup_package_ids'] = $this->normalizedSelectedSetupPackageIds($state['setup_package_ids'] ?? []);
             $icon = $state['server_icon'] ?? null;
             $usesBootstrapInstaller = in_array($state['software'] ?? null, ['forge', 'neoforge', 'bedrock'], true);
             unset(
@@ -541,7 +540,9 @@ class MinecraftSetupPage extends Page implements HasSchemas
                     : app(CurseForgeService::class)->searchPackages($search, $setup, 25),
                 default => [],
             };
-        } catch (\Throwable) {
+        } catch (\Throwable $exception) {
+            report($exception);
+
             return [];
         }
 
@@ -641,6 +642,19 @@ class MinecraftSetupPage extends Page implements HasSchemas
         return in_array($sourceProjectId, $this->selectedSetupPackageIds, true);
     }
 
+    /** @param mixed $statePackageIds
+     *  @return array<int, string>
+     */
+    private function normalizedSelectedSetupPackageIds(mixed $statePackageIds): array
+    {
+        $fromState = is_array($statePackageIds) ? $statePackageIds : [];
+
+        return array_values(array_unique(array_filter(
+            array_map('strval', array_merge($fromState, $this->selectedSetupPackageIds)),
+            fn (string $id): bool => $id !== '' && str_contains($id, ':')
+        )));
+    }
+
     private function loadSetupPackages(bool $popular = false): void
     {
         try {
@@ -684,9 +698,12 @@ class MinecraftSetupPage extends Page implements HasSchemas
                     : app(CurseForgeService::class)->searchPackages($query, $setup),
                 default => [],
             };
-        } catch (\Throwable) {
+        } catch (\Throwable $exception) {
+            report($exception);
             $this->setupPackageResults = [];
-            $this->setupPackageResultsTitle = trans('minecrafttoolkit::strings.installer.none_found', ['packages' => trans('minecrafttoolkit::strings.setup.packages')]);
+            $this->setupPackageResultsTitle = $exception->getMessage() !== ''
+                ? $exception->getMessage()
+                : trans('minecrafttoolkit::strings.installer.none_found', ['packages' => trans('minecrafttoolkit::strings.setup.packages')]);
         }
     }
 

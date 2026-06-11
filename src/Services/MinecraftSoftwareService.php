@@ -44,6 +44,17 @@ class MinecraftSoftwareService
             };
         }
 
+        if ($software === 'bedrock') {
+            return collect($versions)
+                ->filter(fn (mixed $version): bool => is_string($version) && $version !== '')
+                ->unique()
+                ->sortDesc(SORT_NATURAL)
+                ->mapWithKeys(fn (string $version): array => [
+                    $version => $version === 'latest' ? 'Latest official Bedrock server' : $version,
+                ])
+                ->all();
+        }
+
         return collect($versions)
             ->filter(fn (mixed $version): bool => is_string($version) && preg_match('/^\d+(?:\.\d+){1,3}$/', $version) === 1)
             ->unique()
@@ -77,7 +88,7 @@ class MinecraftSoftwareService
 
         try {
             $versions = Cache::remember(
-                "minecrafttoolkit.loader-versions.$software.$minecraftVersion",
+                "minecrafttoolkit.loader-versions.v2.$software.$minecraftVersion",
                 now()->addMinutes(30),
                 fn (): array => $this->fetchLoaderVersions($software, $minecraftVersion)
             );
@@ -173,7 +184,7 @@ class MinecraftSoftwareService
                 ->all(),
             'forge' => $this->forgeMinecraftVersions($this->mavenVersions(
                 'https://maven.minecraftforge.net/net/minecraftforge/forge/maven-metadata.xml'
-            )),
+            ), $this->forgePromotionVersions()),
             'neoforge' => $this->neoForgeMinecraftVersions($this->mavenVersions(
                 'https://maven.neoforged.net/releases/net/neoforged/neoforge/maven-metadata.xml'
             )),
@@ -190,13 +201,7 @@ class MinecraftSoftwareService
                 ->filter(fn (mixed $value): bool => is_string($value))
                 ->values()
                 ->all(),
-            'forge' => collect($this->mavenVersions(
-                'https://maven.minecraftforge.net/net/minecraftforge/forge/maven-metadata.xml'
-            ))
-                ->filter(fn (string $version): bool => str_starts_with($version, "$minecraftVersion-"))
-                ->map(fn (string $version): string => substr($version, strlen($minecraftVersion) + 1))
-                ->values()
-                ->all(),
+            'forge' => $this->forgeLoaderVersions($minecraftVersion),
             'neoforge' => collect($this->mavenVersions(
                 'https://maven.neoforged.net/releases/net/neoforged/neoforge/maven-metadata.xml'
             ))
@@ -256,8 +261,8 @@ class MinecraftSoftwareService
     /** @return array{url: string, source: string, version_id: ?string} */
     private function resolveBedrock(string $version): array
     {
-        $download = $this->bedrockDownload();
-        if ($version !== $download['version']) {
+        $download = $this->bedrockDownload($version === 'latest' ? null : $version);
+        if ($version !== 'latest' && $version !== $download['version']) {
             throw new MinecraftToolkitException("Bedrock $version ist nicht als offizieller Linux-Download verfügbar. Aktuell verfügbar: {$download['version']}.");
         }
 
@@ -363,16 +368,91 @@ class MinecraftSoftwareService
     /** @param string[] $versions
      *  @return string[]
      */
-    public function forgeMinecraftVersions(array $versions): array
+    public function forgeMinecraftVersions(array $versions, array $promotionVersions = []): array
     {
         return collect($versions)
             ->map(fn (string $version): ?string => preg_match('/^(\d+(?:\.\d+){1,2})-/', $version, $match)
                 ? $match[1]
                 : null)
-            ->filter()
+            ->merge($promotionVersions)
+            ->filter(fn (mixed $version): bool => is_string($version) && preg_match('/^\d+(?:\.\d+){1,2}$/', $version) === 1)
             ->unique()
+            ->sortDesc(SORT_NATURAL)
             ->values()
             ->all();
+    }
+
+    /** @return string[] */
+    private function forgePromotionVersions(): array
+    {
+        try {
+            $promos = $this->json('https://files.minecraftforge.net/net/minecraftforge/forge/promotions_slim.json')['promos'] ?? [];
+
+            return collect(array_keys(is_array($promos) ? $promos : []))
+                ->map(fn (string $key): string => preg_replace('/-(latest|recommended)$/', '', $key) ?? $key)
+                ->filter(fn (string $version): bool => preg_match('/^\d+(?:\.\d+){1,2}$/', $version) === 1)
+                ->values()
+                ->all();
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            return [];
+        }
+    }
+
+
+    /** @return string[] */
+    private function forgeLoaderVersions(string $minecraftVersion): array
+    {
+        $mavenLoaders = [];
+
+        try {
+            $mavenLoaders = collect($this->mavenVersions(
+                'https://maven.minecraftforge.net/net/minecraftforge/forge/maven-metadata.xml'
+            ))
+                ->filter(fn (string $version): bool => str_starts_with($version, "$minecraftVersion-"))
+                ->map(fn (string $version): string => substr($version, strlen($minecraftVersion) + 1))
+                ->filter(fn (string $version): bool => $version !== '')
+                ->values()
+                ->all();
+        } catch (\Throwable $exception) {
+            report($exception);
+        }
+
+        $promotionLoaders = $this->forgePromotionLoaderVersions($minecraftVersion);
+
+        return collect($mavenLoaders)
+            ->merge($promotionLoaders)
+            ->filter(fn (mixed $version): bool => is_string($version) && $version !== '')
+            ->unique()
+            ->sortDesc(SORT_NATURAL)
+            ->values()
+            ->all();
+    }
+
+    /** @return string[] */
+    private function forgePromotionLoaderVersions(string $minecraftVersion): array
+    {
+        try {
+            $promos = $this->json('https://files.minecraftforge.net/net/minecraftforge/forge/promotions_slim.json')['promos'] ?? [];
+            if (!is_array($promos)) {
+                return [];
+            }
+
+            $loaders = [];
+            foreach (['recommended', 'latest'] as $channel) {
+                $loader = $promos["$minecraftVersion-$channel"] ?? null;
+                if (is_string($loader) || is_int($loader) || is_float($loader)) {
+                    $loaders[] = (string) $loader;
+                }
+            }
+
+            return $loaders;
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            return [];
+        }
     }
 
     /** @param string[] $versions
@@ -415,14 +495,37 @@ class MinecraftSoftwareService
         } catch (\Throwable $exception) {
             report($exception);
 
-            return config('minecrafttoolkit.bedrock_fallback_versions', []);
+            $fallback = config('minecrafttoolkit.bedrock_fallback_versions', []);
+
+            return is_array($fallback) && $fallback !== [] ? $fallback : ['latest'];
         }
     }
 
     /** @return array{url: string, version: string} */
-    private function bedrockDownload(): array
+    private function bedrockDownload(?string $requestedVersion = null): array
     {
-        return Cache::remember('minecrafttoolkit.bedrock.download.linux', now()->addHours(6), function (): array {
+        $requestedVersion = $requestedVersion !== null && trim($requestedVersion) !== ''
+            ? trim($requestedVersion)
+            : null;
+
+        if ($requestedVersion !== null && preg_match('/^[0-9]+(?:\.[0-9]+){1,3}$/', $requestedVersion) === 1) {
+            return [
+                'url' => "https://www.minecraft.net/bedrockdedicatedserver/bin-linux/bedrock-server-$requestedVersion.zip",
+                'version' => $requestedVersion,
+            ];
+        }
+
+        $configuredUrl = trim((string) config('minecrafttoolkit.bedrock_download_url', ''));
+        $configuredVersion = trim((string) config('minecrafttoolkit.bedrock_download_version', ''));
+
+        if ($configuredUrl !== '' && preg_match('~^https://www\.minecraft\.net/bedrockdedicatedserver/bin-linux/bedrock-server-([0-9.]+)\.zip$~', $configuredUrl, $configuredMatch)) {
+            return [
+                'url' => $configuredUrl,
+                'version' => $configuredVersion !== '' ? $configuredVersion : $configuredMatch[1],
+            ];
+        }
+
+        return Cache::remember('minecrafttoolkit.bedrock.download.linux.v2', now()->addHours(6), function (): array {
             $html = Http::withUserAgent((string) config('minecrafttoolkit.user_agent'))
                 ->accept('text/html')
                 ->connectTimeout(5)
@@ -431,7 +534,7 @@ class MinecraftSoftwareService
                 ->throw()
                 ->body();
 
-            $normalized = str_replace('\\/', '/', $html);
+            $normalized = str_replace('\/', '/', $html);
             if (!preg_match('~https://www\.minecraft\.net/bedrockdedicatedserver/bin-linux/bedrock-server-([0-9.]+)\.zip~', $normalized, $match)) {
                 throw new MinecraftToolkitException('Der offizielle Bedrock-Linux-Download konnte nicht gefunden werden.');
             }

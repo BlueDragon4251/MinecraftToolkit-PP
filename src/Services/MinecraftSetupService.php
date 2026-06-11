@@ -82,7 +82,7 @@ class MinecraftSetupService
             }
 
             if ($isBedrock) {
-                $this->files->pullFile($server, $download['url'], $download['file_name'], ['zip']);
+                $this->files->downloadFile($server, $download['url'], $download['file_name'], ['zip']);
                 $this->files->write(
                     $server,
                     '/server.properties',
