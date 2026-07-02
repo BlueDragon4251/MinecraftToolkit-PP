@@ -82,16 +82,25 @@ $tests['Forge Minecraft version mapping'] = function (): void {
 
 $tests['NeoForge Minecraft version mapping'] = function (): void {
     $service = new MinecraftSoftwareService();
-    $versions = $service->neoForgeMinecraftVersions([
+    $versions = array_values(array_unique(array_merge(
+        $service->forgeMinecraftVersions([
+            '1.20.1-47.1.106',
+            '1.20.1-47.1.105',
+        ]),
+        $service->neoForgeMinecraftVersions([
         '21.0.167',
         '21.1.219',
         '20.4.251',
         '26.1.2.75',
-    ]);
+        '26.2.0.7-beta',
+        ])
+    )));
 
-    assertSame(['1.21', '1.21.1', '1.20.4', '26.1.2'], $versions);
+    assertSame(['1.20.1', '1.21', '1.21.1', '1.20.4', '26.1', '26.2'], $versions);
+    assertSame('20.4.', $service->neoForgePrefix('1.20.4'));
     assertSame('21.1.', $service->neoForgePrefix('1.21.1'));
-    assertSame('26.1.2.', $service->neoForgePrefix('26.1.2'));
+    assertSame('26.1.', $service->neoForgePrefix('26.1'));
+    assertSame('26.2.', $service->neoForgePrefix('26.2'));
 };
 
 $tests['Modrinth plugin facets'] = function (): void {
@@ -152,6 +161,116 @@ $tests['package filename validation'] = function (): void {
     }
 
     throw new RuntimeException('Unsafe package filename was accepted.');
+};
+
+$tests['download URL security validation'] = function (): void {
+    $reflection = new ReflectionClass(BlueWolf\MinecraftToolkit\Services\MinecraftServerFileService::class);
+    $service = $reflection->newInstanceWithoutConstructor();
+
+    foreach ([
+        'http://modrinth.com/file.jar',
+        'https://user:pass@modrinth.com/file.jar',
+        'https://modrinth.com:444/file.jar',
+        'https://example.com/file.jar',
+    ] as $url) {
+        try {
+            invokePrivate($service, 'assertDownloadUrl', [$url]);
+        } catch (Throwable) {
+            continue;
+        }
+
+        throw new RuntimeException("Unsafe download URL was accepted: $url");
+    }
+};
+
+$tests['download redirect resolution'] = function (): void {
+    $reflection = new ReflectionClass(BlueWolf\MinecraftToolkit\Services\MinecraftServerFileService::class);
+    $service = $reflection->newInstanceWithoutConstructor();
+
+    assertSame(
+        'https://cdn.modrinth.com/data/example/file.jar',
+        invokePrivate($service, 'resolveRedirectUrl', [
+            'https://cdn.modrinth.com/data/example/old.jar',
+            '/data/example/file.jar',
+        ])
+    );
+    assertSame(
+        'https://cdn.modrinth.com/data/example/file.jar',
+        invokePrivate($service, 'resolveRedirectUrl', [
+            'https://cdn.modrinth.com/data/example/old.jar',
+            'file.jar',
+        ])
+    );
+};
+
+$tests['JAR magic and structure validation'] = function (): void {
+    $reflection = new ReflectionClass(BlueWolf\MinecraftToolkit\Services\MinecraftServerFileService::class);
+    $service = $reflection->newInstanceWithoutConstructor();
+
+    try {
+        invokePrivate($service, 'assertJarMagicBytes', ['not-a-zip']);
+    } catch (Throwable) {
+        return;
+    }
+
+    throw new RuntimeException('Invalid JAR magic bytes were accepted.');
+};
+
+$tests['JAR class version extraction'] = function (): void {
+    if (!class_exists(ZipArchive::class)) {
+        return;
+    }
+
+    $tmp = tempnam(sys_get_temp_dir(), 'mtk-test-jar-');
+    $zip = new ZipArchive();
+    $zip->open($tmp, ZipArchive::OVERWRITE);
+    $zip->addFromString('Example.class', pack('Nnn', 0xCAFEBABE, 0, 66));
+    $zip->close();
+
+    try {
+        $contents = file_get_contents($tmp);
+        if (!is_string($contents)) {
+            throw new RuntimeException('Could not read test JAR.');
+        }
+
+        $reflection = new ReflectionClass(BlueWolf\MinecraftToolkit\Services\MinecraftServerFileService::class);
+        $service = $reflection->newInstanceWithoutConstructor();
+
+        assertSame(66, invokePrivate($service, 'extractMaxClassMajorVersionFromJar', [$contents]));
+    } finally {
+        @unlink($tmp);
+    }
+};
+
+$tests['JAR inspection metadata'] = function (): void {
+    if (!class_exists(ZipArchive::class)) {
+        return;
+    }
+
+    $tmp = tempnam(sys_get_temp_dir(), 'mtk-test-jar-');
+    $zip = new ZipArchive();
+    $zip->open($tmp, ZipArchive::OVERWRITE);
+    $zip->addFromString('plugin.yml', "name: Example\nversion: 1.2.3\n");
+    $zip->addFromString('Example.class', pack('Nnn', 0xCAFEBABE, 0, 65));
+    $zip->close();
+
+    try {
+        $contents = file_get_contents($tmp);
+        if (!is_string($contents)) {
+            throw new RuntimeException('Could not read test JAR.');
+        }
+
+        $reflection = new ReflectionClass(BlueWolf\MinecraftToolkit\Services\MinecraftServerFileService::class);
+        $service = $reflection->newInstanceWithoutConstructor();
+        $metadata = $service->inspectJarContents($contents);
+
+        assertSame(hash('sha1', $contents), $metadata['sha1']);
+        assertSame(hash('sha512', $contents), $metadata['sha512']);
+        assertSame('1.2.3', $metadata['plugin_version']);
+        assertSame(65, $metadata['class_major_version']);
+    } finally {
+        @unlink($tmp);
+    }
 };
 
 $tests['targeted Geyser YAML patch'] = function (): void {
@@ -310,6 +429,18 @@ $tests['package compatibility classification'] = function (): void {
     ]);
     assertSame('update_required', $service->checkPackage($update, $target)['status']);
 
+    $pinned = new MinecraftToolkitPackage();
+    $pinned->forceFill([
+        'id' => 22,
+        'project_name' => 'Pinned Update',
+        'source' => 'modrinth',
+        'source_project_id' => 'update',
+        'source_version_id' => 'installed-version',
+        'package_type' => 'plugin',
+        'update_pinned' => true,
+    ]);
+    assertSame('pinned', $service->checkPackage($pinned, $target)['status']);
+
     $missing = new MinecraftToolkitPackage();
     $missing->forceFill([
         'id' => 3,
@@ -432,4 +563,12 @@ function assertSame(mixed $expected, mixed $actual): void
     if ($expected !== $actual) {
         throw new RuntimeException('Values are not identical.');
     }
+}
+
+function invokePrivate(object $object, string $method, array $parameters = []): mixed
+{
+    $reflection = new ReflectionClass($object);
+    $methodReflection = $reflection->getMethod($method);
+
+    return $methodReflection->invokeArgs($object, $parameters);
 }
