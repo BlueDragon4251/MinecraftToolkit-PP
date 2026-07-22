@@ -17,10 +17,19 @@ use BlueWolf\MinecraftToolkit\Services\MinecraftSoftwareService;
 use BlueWolf\MinecraftToolkit\Services\MinecraftUpdateService;
 use BlueWolf\MinecraftToolkit\Services\MinecraftCompatibilityService;
 use BlueWolf\MinecraftToolkit\Services\MinecraftVersionChangeService;
+use BlueWolf\MinecraftToolkit\Services\MinecraftModpackService;
+use BlueWolf\MinecraftToolkit\Services\BlueItAnnouncementService;
+use BlueWolf\MinecraftToolkit\Livewire\BlueItAnnouncements;
 use BlueWolf\MinecraftToolkit\Services\CurseForgeApiKeyProvider;
 use BlueWolf\MinecraftToolkit\Services\CurseForgeService;
+use App\Models\Subuser;
+use Filament\Facades\Filament;
+use Filament\Support\Facades\FilamentView;
+use Filament\View\PanelsRenderHook;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Lang;
+use Livewire\Livewire;
 
 class MinecraftToolkitPluginProvider extends ServiceProvider
 {
@@ -38,15 +47,35 @@ class MinecraftToolkitPluginProvider extends ServiceProvider
         $this->app->singleton(MinecraftUpdateService::class);
         $this->app->singleton(MinecraftCompatibilityService::class);
         $this->app->singleton(MinecraftVersionChangeService::class);
+        $this->app->singleton(MinecraftModpackService::class);
         $this->app->singleton(MinecraftServerFileService::class);
         $this->app->singleton(MinecraftServerStateService::class);
         $this->app->singleton(MinecraftSetupService::class);
+        $this->app->singleton(BlueItAnnouncementService::class);
+
+        Subuser::registerCustomPermissions(
+            'minecrafttoolkit',
+            ['announcements'],
+            'minecrafttoolkit::permissions',
+            'tabler-message'
+        );
     }
 
     public function boot(): void
     {
         $this->loadTranslationsFrom(plugin_path('minecrafttoolkit', 'lang'), 'minecrafttoolkit');
+        $this->loadViewsFrom(plugin_path('minecrafttoolkit', 'resources/views'), 'minecrafttoolkit');
         $this->loadPluginTranslationsForCurrentLocale();
+
+        Livewire::component('minecraft-toolkit-blueit-announcements', BlueItAnnouncements::class);
+
+        FilamentView::registerRenderHook(
+            PanelsRenderHook::BODY_START,
+            fn (): string => Blade::render(
+                '@livewire("minecraft-toolkit-blueit-announcements", ["panelId" => $panelId])',
+                ['panelId' => Filament::getCurrentPanel()?->getId() ?? 'app']
+            )
+        );
     }
 
     private function loadPluginTranslationsForCurrentLocale(): void

@@ -48,6 +48,22 @@
             </div>
         </x-filament::section>
 
+        <x-filament::section :heading="trans('minecrafttoolkit::strings.overview.admin_checklist')">
+            <div class="grid gap-3 md:grid-cols-2">
+                @foreach ($adminChecklist as $item)
+                    <div class="rounded-lg border border-gray-200 p-3 text-sm dark:border-white/10">
+                        <div class="flex items-center justify-between gap-2">
+                            <span class="font-medium">{{ $item['label'] }}</span>
+                            <span class="{{ $item['ok'] ? 'text-success-600' : 'text-warning-600' }}">
+                                {{ $item['ok'] ? trans('minecrafttoolkit::strings.overview.check_ok') : trans('minecrafttoolkit::strings.overview.check_review') }}
+                            </span>
+                        </div>
+                        <div class="mt-1 text-xs text-gray-500">{{ $item['detail'] }}</div>
+                    </div>
+                @endforeach
+            </div>
+        </x-filament::section>
+
         <x-filament::section :heading="trans('minecrafttoolkit::strings.overview.latest_logs')">
             <div class="space-y-2">
                 @forelse ($logs as $log)
@@ -66,7 +82,22 @@
                         <div class="mt-1 text-xs text-gray-500">{{ $backup['path'] }}</div>
                         <div class="mt-2 text-gray-600 dark:text-gray-300">
                             @forelse ($backup['files'] as $file)
-                                <span class="mr-2">{{ $file['name'] }}</span>
+                                <span class="mr-2 inline-flex items-center gap-2">
+                                    <span>{{ $file['name'] }}</span>
+                                    @if ($file['restore_path'])
+                                        <x-filament::button
+                                            size="xs"
+                                            color="warning"
+                                            wire:click="restoreBackupFile('{{ addslashes($backup['path']) }}', '{{ addslashes($file['name']) }}', '{{ addslashes($file['restore_path']) }}')"
+                                            wire:confirm="{{ trans('minecrafttoolkit::strings.overview.restore_confirm', ['target' => $file['restore_path']]) }}"
+                                            wire:loading.attr="disabled"
+                                        >
+                                            {{ trans('minecrafttoolkit::strings.overview.restore') }}
+                                        </x-filament::button>
+                                    @else
+                                        <span class="text-xs text-gray-500">{{ trans('minecrafttoolkit::strings.overview.restore_unknown') }}</span>
+                                    @endif
+                                </span>
                             @empty
                                 <span>{{ trans('minecrafttoolkit::strings.overview.backup_files_unavailable') }}</span>
                             @endforelse

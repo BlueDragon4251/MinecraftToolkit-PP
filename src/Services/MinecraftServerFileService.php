@@ -24,6 +24,17 @@ class MinecraftServerFileService
         return $this->repository($server)->getContent($this->safePath($path), $limit);
     }
 
+    public function makeDirectory(Server $server, string $path): void
+    {
+        $path = $this->safePath($path);
+        $parent = dirname($path);
+        if ($parent !== '/' && $parent !== '\\' && $parent !== '.') {
+            $this->makeDirectory($server, $parent);
+        }
+
+        $this->ensureDirectory($this->repository($server), basename($path), $parent === '\\' ? '/' : $parent);
+    }
+
 
     /** @return array<int, array<string, mixed>> */
     public function listDirectory(Server $server, string $path): array
@@ -92,6 +103,32 @@ class MinecraftServerFileService
         $this->write($server, '/' . $fileName, $contents);
 
         return [
+            'sha1' => hash('sha1', $contents),
+            'sha256' => hash('sha256', $contents),
+            'sha512' => hash('sha512', $contents),
+            'size' => strlen($contents),
+        ];
+    }
+
+    /** @param string[] $allowedExtensions
+     *  @return array{contents: string, sha1: string, sha256: string, sha512: string, size: int}
+     */
+    public function downloadContents(string $url, array $allowedExtensions = ['jar', 'zip', 'mrpack']): array
+    {
+        $path = parse_url($url, PHP_URL_PATH);
+        $extension = strtolower(pathinfo(is_string($path) ? $path : '', PATHINFO_EXTENSION));
+        if ($extension !== '' && !in_array($extension, $allowedExtensions, true)) {
+            throw new MinecraftToolkitException('Der Download-Dateityp ist nicht erlaubt.');
+        }
+
+        $response = $this->downloadResponse($url);
+        $contents = $response->body();
+        if ($contents === '' || strlen($contents) > $this->configInt('max_package_bytes', 104857600)) {
+            throw new MinecraftToolkitException('Der Paketdownload ist leer oder überschreitet das Größenlimit.');
+        }
+
+        return [
+            'contents' => $contents,
             'sha1' => hash('sha1', $contents),
             'sha256' => hash('sha256', $contents),
             'sha512' => hash('sha512', $contents),
@@ -174,7 +211,7 @@ class MinecraftServerFileService
     public function inspectJarContents(string $contents): array
     {
         if ($contents === '' || strlen($contents) > $this->configInt('max_package_bytes', 104857600)) {
-            throw new MinecraftToolkitException('Der Paketinhalt ist leer oder ueberschreitet das Groessenlimit.');
+            throw new MinecraftToolkitException('Der Paketinhalt ist leer oder überschreitet das Größenlimit.');
         }
 
         $this->assertJarMagicBytes($contents);
@@ -213,7 +250,7 @@ class MinecraftServerFileService
 
             $location = $response->header('Location');
             if (!is_string($location) || trim($location) === '') {
-                throw new MinecraftToolkitException('Der Download wurde ohne gueltiges Redirect-Ziel umgeleitet.');
+                throw new MinecraftToolkitException('Der Download wurde ohne gültiges Redirect-Ziel umgeleitet.');
             }
 
             $currentUrl = $this->resolveRedirectUrl($currentUrl, $location);
@@ -349,6 +386,27 @@ class MinecraftServerFileService
         $this->repository($server)->deleteFiles('/', [ltrim($path, '/')])->throw();
     }
 
+    public function restoreBackupFile(Server $server, string $backupPath, string $fileName, string $targetPath): ?string
+    {
+        $backupPath = $this->safeBackupPath($backupPath);
+        $fileName = $this->safeBackupFileName($fileName);
+        $targetPath = $this->safePath($targetPath);
+
+        $contents = $this->read(
+            $server,
+            "$backupPath/$fileName",
+            $this->configInt('max_package_bytes', 104857600) + 1
+        );
+        if ($contents === '' || strlen($contents) > $this->configInt('max_package_bytes', 104857600)) {
+            throw new MinecraftToolkitException('Die Backup-Datei ist leer oder überschreitet das Größenlimit.');
+        }
+
+        $currentBackup = $this->backupIfPresent($server, $targetPath);
+        $this->write($server, $targetPath, $contents);
+
+        return $currentBackup;
+    }
+
     /** @return array<int, array{path: string, created: string, files: array<int, array{name: string, size: int|null}>}> */
     public function listBackups(Server $server, int $limit = 10): array
     {
@@ -415,6 +473,28 @@ class MinecraftServerFileService
         return $path;
     }
 
+    private function safeBackupPath(string $path): string
+    {
+        $path = $this->safePath($path);
+        if (!preg_match('#^/\.minecraft-toolkit/backups/[0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9]{2}-[0-9]{2}-[0-9]{2}$#', $path)) {
+            throw new MinecraftToolkitException('Der Backup-Pfad ist ungültig.');
+        }
+
+        return $path;
+    }
+
+    private function safeBackupFileName(string $fileName): string
+    {
+        if (!preg_match('/^[A-Za-z0-9][A-Za-z0-9._+() -]{0,199}$/', $fileName)
+            || str_contains($fileName, '..')
+            || str_contains($fileName, '/')
+            || str_contains($fileName, '\\')) {
+            throw new MinecraftToolkitException('Der Backup-Dateiname ist ungültig.');
+        }
+
+        return $fileName;
+    }
+
     private function assertJarMagicBytes(string $contents): void
     {
         if (str_starts_with($contents, "PK\x03\x04")
@@ -423,7 +503,7 @@ class MinecraftServerFileService
             return;
         }
 
-        throw new MinecraftToolkitException('Der Download ist keine gueltige JAR/ZIP-Datei.');
+        throw new MinecraftToolkitException('Der Download ist keine gültige JAR/ZIP-Datei.');
     }
 
     /** @param array<string, string> $hashes */
@@ -438,7 +518,7 @@ class MinecraftServerFileService
         }
 
         throw new MinecraftToolkitException(
-            'Diese Installation verlangt SHA-256 oder SHA-512 fuer Paketdownloads.'
+            'Diese Installation verlangt SHA-256 oder SHA-512 für Paketdownloads.'
         );
     }
 

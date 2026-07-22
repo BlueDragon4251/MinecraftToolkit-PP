@@ -174,6 +174,12 @@
                     <div>
                         <div class="font-medium">{{ $package['project_name'] }}</div>
                         <div class="text-sm text-gray-500">{{ ucfirst($package['source']) }} · {{ $package['version_number'] ?: '—' }} · {{ $package['file_name'] }}</div>
+                        <div class="text-xs text-gray-500">
+                            <code>{{ $package['file_path'] ?: '—' }}</code>
+                            @if ($package['installed_at'])
+                                · {{ $package['installed_at'] }}
+                            @endif
+                        </div>
                     </div>
                 </div>
             @empty

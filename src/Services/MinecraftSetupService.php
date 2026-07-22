@@ -23,6 +23,7 @@ class MinecraftSetupService
         private readonly MinecraftServerStateService $state,
         private readonly MinecraftCrossplayService $crossplay,
         private readonly MinecraftPackageInstaller $packageInstaller,
+        private readonly MinecraftRiskGateService $riskGate,
     ) {}
 
     /** @param array<string, mixed> $data */
@@ -307,6 +308,8 @@ class MinecraftSetupService
         if ($startup === null) {
             return;
         }
+
+        $this->riskGate->assertAllowed('startup_edits', $server);
 
         $user = user();
         if ($user === null || (!$user->isRootAdmin()

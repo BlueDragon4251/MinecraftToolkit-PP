@@ -5,6 +5,11 @@
     </form>
     @if ($report)
         <x-filament::section :heading="trans('minecrafttoolkit::strings.version_change.compatibility')">
+            @if ($report['cached'] ?? false)
+                <div class="mb-4 rounded-lg border border-primary-200 bg-primary-50 p-3 text-sm text-primary-700 dark:border-primary-500/30 dark:bg-primary-500/10 dark:text-primary-300">
+                    {{ trans('minecrafttoolkit::strings.version_change.cached_report') }}
+                </div>
+            @endif
             <div class="mb-4 grid gap-3 md:grid-cols-3">
                 <div><div class="text-sm text-gray-500">{{ trans('minecrafttoolkit::strings.version_change.target_version') }}</div><div class="font-semibold">{{ $report['target']['minecraft_version'] }}</div></div>
                 <div><div class="text-sm text-gray-500">{{ trans('minecrafttoolkit::strings.version_change.package_updates') }}</div><div class="font-semibold">{{ $report['updates'] }}</div></div>

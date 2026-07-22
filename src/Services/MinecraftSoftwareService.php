@@ -185,14 +185,18 @@ class MinecraftSoftwareService
             'forge' => $this->forgeMinecraftVersions($this->mavenVersions(
                 'https://maven.minecraftforge.net/net/minecraftforge/forge/maven-metadata.xml'
             ), $this->forgePromotionVersions()),
-            'neoforge' => array_values(array_unique(array_merge(
-                $this->forgeMinecraftVersions($this->mavenVersions(
-                    'https://maven.neoforged.net/releases/net/neoforged/forge/maven-metadata.xml'
-                )),
-                $this->neoForgeMinecraftVersions($this->mavenVersions(
-                    'https://maven.neoforged.net/releases/net/neoforged/neoforge/maven-metadata.xml'
+            'neoforge' => collect(array_merge(
+                    $this->forgeMinecraftVersions($this->mavenVersions(
+                        'https://maven.neoforged.net/releases/net/neoforged/forge/maven-metadata.xml'
+                    )),
+                    $this->neoForgeMinecraftVersions($this->mavenVersions(
+                        'https://maven.neoforged.net/releases/net/neoforged/neoforge/maven-metadata.xml'
+                    ))
                 ))
-            ))),
+                ->unique()
+                ->sortDesc(SORT_NATURAL)
+                ->values()
+                ->all(),
             default => [],
         };
     }
@@ -477,20 +481,28 @@ class MinecraftSoftwareService
     {
         return collect($versions)
             ->map(function (string $version): ?string {
+                $version = preg_replace('/-(?:beta|alpha|rc).*$/i', '', $version) ?? $version;
                 if (!preg_match('/^(\d+)\.(\d+)(?:\.(\d+))?/', $version, $match)) {
                     return null;
                 }
 
-                if ((int) $match[1] >= 26) {
-                    return $match[1] . '.' . $match[2];
+                $major = (int) $match[1];
+                $minor = (int) $match[2];
+                $patch = isset($match[3]) ? (int) $match[3] : null;
+
+                if ($major >= 26) {
+                    return $patch !== null && $patch > 0
+                        ? "$major.$minor.$patch"
+                        : "$major.$minor";
                 }
 
-                return $match[2] === '0'
-                    ? '1.' . $match[1]
-                    : '1.' . $match[1] . '.' . $match[2];
+                return $minor === 0
+                    ? "1.$major"
+                    : "1.$major.$minor";
             })
             ->filter()
             ->unique()
+            ->sortDesc(SORT_NATURAL)
             ->values()
             ->all();
     }
@@ -503,9 +515,16 @@ class MinecraftSoftwareService
     /** @return string[] */
     public function neoForgePrefixes(string $minecraftVersion): array
     {
-        return str_starts_with($minecraftVersion, '1.')
-            ? [substr($minecraftVersion, 2) . '.']
-            : [$minecraftVersion . '.'];
+        if (str_starts_with($minecraftVersion, '1.')) {
+            return [substr($minecraftVersion, 2) . '.'];
+        }
+
+        $parts = explode('.', $minecraftVersion);
+        if (count($parts) >= 3) {
+            return [$minecraftVersion . '.'];
+        }
+
+        return [$minecraftVersion . '.'];
     }
 
     /** @return string[] */

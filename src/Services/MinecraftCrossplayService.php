@@ -20,10 +20,12 @@ class MinecraftCrossplayService
         private readonly GeyserDownloadService $downloads,
         private readonly MinecraftServerFileService $files,
         private readonly MinecraftServerStateService $state,
+        private readonly MinecraftRiskGateService $riskGate,
     ) {}
 
     public function install(Server $server, MinecraftToolkitSetup $setup, int $allocationId): bool
     {
+        $this->riskGate->assertAllowed('crossplay_setup', $server);
         $this->assertSupported($setup);
         $this->state->assertOffline($server);
         $allocation = $this->resolveAllocation($server, $allocationId);
@@ -85,6 +87,7 @@ class MinecraftCrossplayService
 
     public function applyConfig(Server $server, MinecraftToolkitSetup $setup): void
     {
+        $this->riskGate->assertAllowed('crossplay_setup', $server);
         $this->assertSupported($setup);
         $this->state->assertOffline($server);
         if (!$this->applyConfigIfPresent($server, $setup)) {

@@ -70,6 +70,28 @@
                                 <span> | {{ implode(', ', $package['health']['reasons']) }}</span>
                             @endif
                         </div>
+                        <div class="mt-2 grid gap-1 text-xs text-gray-500 md:grid-cols-2">
+                            <div>{{ trans('minecrafttoolkit::strings.updater.file') }}: <code>{{ $package['file_name'] ?: '—' }}</code></div>
+                            <div>{{ trans('minecrafttoolkit::strings.updater.path') }}: <code>{{ $package['file_path'] ?: '—' }}</code></div>
+                            <div>{{ trans('minecrafttoolkit::strings.updater.version_id') }}: <code>{{ $package['version_id'] ?: '—' }}</code></div>
+                            <div>{{ trans('minecrafttoolkit::strings.updater.minecraft_target') }}: {{ $package['minecraft_version'] ?: '—' }} / {{ $package['loader'] ?: '—' }}</div>
+                            <div>{{ trans('minecrafttoolkit::strings.updater.hashes') }}:
+                                @if ($package['sha512'])
+                                    SHA-512
+                                @elseif ($package['sha1'])
+                                    SHA-1
+                                @else
+                                    {{ trans('minecrafttoolkit::strings.updater.no_hash') }}
+                                @endif
+                            </div>
+                            <div>{{ trans('minecrafttoolkit::strings.updater.dependencies') }}: {{ $package['dependencies_count'] }}</div>
+                            @if ($package['installed_at'])
+                                <div>{{ trans('minecrafttoolkit::strings.updater.installed_at') }}: {{ $package['installed_at'] }}</div>
+                            @endif
+                            @if ($package['project_id'])
+                                <div>{{ trans('minecrafttoolkit::strings.updater.project_id') }}: <code>{{ $package['project_id'] }}</code></div>
+                            @endif
+                        </div>
                     </div>
                     <div class="flex flex-wrap gap-2 md:justify-end">
                         @if ($package['status'] === 'update_available' && ! $package['pinned'])

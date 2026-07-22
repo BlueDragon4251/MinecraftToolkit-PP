@@ -6,7 +6,7 @@ Minecraft Toolkit is a Pelican Panel plugin for setting up and managing Minecraf
 
 See [`CHANGELOG.md`](./CHANGELOG.md) for version history and notable changes.
 
-Current version: `1.3.0`.
+Current version: `1.3.5`.
 
 ## License and usage rights
 
@@ -19,10 +19,13 @@ No CurseForge API key is included in the public plugin source. CurseForge is ena
 ## Features
 
 - Guided setup for Vanilla Java, Vanilla Bedrock, Paper, Folia, Purpur, Fabric, Forge, and NeoForge
+- Setup templates for common presets such as Vanilla Survival, Paper Performance, Purpur Crossplay, Fabric Technical, Forge Modded, and Bedrock Survival
+- Optional package profiles during setup, including Paper basics, voice chat, and Fabric performance starter sets
 - Automatic Minecraft and loader version selection from official sources
 - Generation of `eula.txt` and `server.properties`
 - Optional plugin/mod selection during setup; selected packages from Modrinth and CurseForge can be mixed and are installed immediately after setup completes
 - Installer opens with popular compatible packages before searching. The setup package browser is shown only inside the Mods/Plugins setup step and can load popular packages from the selected enabled source.
+- Public Modrinth and CurseForge modpack browsing after setup, custom `.mrpack`/`.zip` uploads, combine/replace installation modes, and switching between installed modpacks with archived files
 - Installer review shows project links, categories, publish/update dates, file size, source hashes, and a compatibility summary before installation.
 - Package search can be narrowed by category, author, server-side metadata, minimum downloads, and result sorting.
 - MOTD formatter helper for Minecraft color and style codes
@@ -45,7 +48,7 @@ All server files are accessed through Pelican's Wings API. The plugin does not r
 ## Requirements
 
 - Pelican Panel compatible with `^1.0.0-beta34`
-- PHP 8.3 or newer with `curl`, `mbstring`, `openssl`, and `SimpleXML`
+- PHP 8.3 or newer with `curl`, `mbstring`, `openssl`, `SimpleXML`, and `zip`
 - Reachable Wings node
 - A Minecraft-compatible Egg; Java servers need a Java image, Bedrock servers need an image with unzip and Bedrock runtime support
 - HTTPS access from the Panel host to Mojang, PaperMC, PurpurMC, Fabric, Forge, NeoForge, Modrinth, and GeyserMC
@@ -129,6 +132,17 @@ Required dependencies reported by Modrinth or CurseForge are installed automatic
 
 CurseForge is enabled by default through the signed BlueIT service. The real CurseForge API key stays outside the plugin source. Administrators can still override the backend connection or use a private direct API key in self-hosted/private installs. If CurseForge is disabled or no valid backend/key is available, CurseForge is hidden from server users while Modrinth continues to work.
 
+## Modpacks
+
+Open **Minecraft Modpacks** after setup to browse public Modrinth or CurseForge modpacks, upload your own `.mrpack` or `.zip`, and install the selected pack while the server is stopped.
+
+Two installation modes are available:
+
+- **Combine:** writes the modpack files into the current server files without archiving unrelated existing files.
+- **Replace:** moves existing `/mods` files into `/.minecraft-toolkit/modpacks/replaced/...` before installing the new pack.
+
+Installed modpacks are tracked and can be activated later. When switching, Minecraft Toolkit archives the currently active tracked modpack files under `/.minecraft-toolkit/modpacks/archives/...` and restores the selected modpack files where possible.
+
 CurseForge does not consistently expose whether a mod is client-only or server-compatible. The Toolkit shows a warning for ambiguous CurseForge mods and requires the user to verify the project description before installation.
 
 ## Crossplay
@@ -162,7 +176,7 @@ Before installing an update:
 2. Update one package or click **Alle verfügbaren Updates installieren**.
 3. Start the server and verify its console and plugin or mod list.
 
-Before each update check, Minecraft Toolkit compares its database with the actual loaded plugin versions from `logs/latest.log` where available. If the real installed version differs from the database, the database is synchronized first and the package is not falsely marked as current. For each real update, the old JAR is moved into the Toolkit backup directory before the new file is downloaded. If the download or checksum validation fails, the plugin attempts to restore the old file and leaves the database on the previous version.
+Before each update check, Minecraft Toolkit compares its database with the actual loaded plugin versions from `logs/latest.log` where available. If the real installed version differs from the database, the database is synchronized first and the package is not falsely marked as current. For each real update, the old server file or package JAR is moved into the Toolkit backup directory before the new file is downloaded. If the download or checksum validation fails, the plugin attempts to restore the old file and leaves the database on the previous version.
 
 The updater currently supports:
 
@@ -171,14 +185,16 @@ The updater currently supports:
 - Managed CurseForge plugins and mods
 - Geyser
 - Floodgate
+- Managed server artifacts for supported server software, including Vanilla Java, Vanilla Bedrock, Paper, Purpur, Folia, Fabric, Forge, and NeoForge
 
-Managed packages can be pinned from the updater. Pinned packages are skipped by update checks, individual updates, bulk updates, and automatic version-change package updates. The updater also provides bulk actions to pin all packages, unpin all packages, or verify every managed package. During a Minecraft version change, a pinned package that would need a compatible replacement is shown as a blocking package until it is unpinned, removed with backup, or the user explicitly accepts the risk.
+Managed packages and server artifacts can be pinned from the updater. Pinned entries are skipped by update checks, individual updates, bulk updates, and automatic version-change package updates. The updater also provides bulk actions to pin all entries, unpin all entries, or verify every managed entry. During a Minecraft version change, a pinned package that would need a compatible replacement is shown as a blocking package until it is unpinned, removed with backup, or the user explicitly accepts the risk.
 
-The updater can also verify an installed managed package in place. Verification reads the current JAR through Wings, checks the stored SHA-512 or SHA-1 where available, validates the JAR archive structure, extracts plugin metadata, and applies the Java class-version safety check.
+The updater can also verify an installed managed file in place. JAR verification reads the current file through Wings, checks the stored SHA-512 or SHA-1 where available, validates the JAR archive structure, extracts plugin metadata, and applies the Java class-version safety check. Non-JAR server artifacts are verified as present without JAR metadata extraction.
 
 Each managed package also shows a lightweight health score based on source trust, stored hash strength, pinning, verification status, update availability, and the latest updater error state.
+Updater cards include operational details such as file path, source version ID, Minecraft/loader target, hash availability, dependency count, and install age so administrators can audit managed entries without opening the database.
 
-The updater also reports recent plugin load failures detected in `logs/latest.log`, including missing plugin dependencies and Java class-version incompatibilities. Manually uploaded files and the server software itself are not updated automatically.
+The updater also reports recent plugin load failures detected in `logs/latest.log`, including missing plugin dependencies and Java class-version incompatibilities. Manually uploaded files are not updated automatically.
 
 ## Changing the Minecraft Version
 
@@ -190,6 +206,8 @@ Open **Minecraft-Version ändern** after the initial setup:
 4. Review every managed plugin, mod, dependency, and crossplay package.
 5. Stop the server.
 6. Choose the available change strategy.
+
+Compatibility results are cached briefly per server, target software/version/loader, and installed package fingerprint. Package updates, removals, pins, or a different target automatically produce a fresh check.
 
 Package statuses:
 
@@ -242,18 +260,26 @@ Administrators can configure Minecraft Toolkit from the Pelican plugin settings 
 | `MINECRAFT_TOOLKIT_VERSION_CHANGE_USERS_ENABLED` | `true` | Allows non-admin server owners and permitted subusers to change versions |
 | `MINECRAFT_TOOLKIT_CROSSPLAY_ENABLED` | `true` | Enables Geyser/Floodgate support |
 | `MINECRAFT_TOOLKIT_BEDROCK_PORT_REQUIRED` | `true` | Requires a separate Bedrock allocation |
+| `MINECRAFT_TOOLKIT_SECURITY_AUDIT_LOG_ENABLED` | `true` | Writes security audit entries for gated risky actions |
+| `MINECRAFT_TOOLKIT_RISK_GATE_STARTUP_EDITS_ADMIN_ONLY` | `false` | Requires root admin for Toolkit startup command changes |
+| `MINECRAFT_TOOLKIT_RISK_GATE_VERSION_RISK_ADMIN_ONLY` | `false` | Requires root admin for risky version changes |
+| `MINECRAFT_TOOLKIT_RISK_GATE_PACKAGE_REMOVAL_ADMIN_ONLY` | `false` | Requires root admin for managed package removal or remove-and-change workflows |
+| `MINECRAFT_TOOLKIT_RISK_GATE_CURSEFORGE_USAGE_ADMIN_ONLY` | `false` | Requires root admin for CurseForge browsing and installation |
+| `MINECRAFT_TOOLKIT_RISK_GATE_CROSSPLAY_SETUP_ADMIN_ONLY` | `false` | Requires root admin for Crossplay installation and config patching |
+| `MINECRAFT_TOOLKIT_RISK_GATE_RAW_PROPERTIES_ADMIN_ONLY` | `false` | Requires root admin for raw `server.properties` editing |
 | `MINECRAFT_TOOLKIT_BEDROCK_DOWNLOAD_URL` | empty | Optional direct Linux Bedrock server ZIP URL override when the official download page cannot be parsed |
 | `MINECRAFT_TOOLKIT_BEDROCK_DOWNLOAD_VERSION` | empty | Version label for the direct Bedrock download URL if it cannot be extracted from the file name |
 | `MINECRAFT_TOOLKIT_BEDROCK_FALLBACK_VERSIONS` | `latest` | Fallback Bedrock setup versions shown when live lookup fails. Use comma-separated explicit versions for direct version URLs. |
 | `MINECRAFT_TOOLKIT_HTTP_TIMEOUT` | `20` | Metadata API timeout in seconds |
 | `MINECRAFT_TOOLKIT_DOWNLOAD_TIMEOUT` | `300` | Package download timeout in seconds |
+| `MINECRAFT_TOOLKIT_COMPATIBILITY_CACHE_MINUTES` | `30` | Cache duration for repeated version-change compatibility checks. Set to `0` to disable |
 | `MINECRAFT_TOOLKIT_BLOCK_PRIVATE_DOWNLOAD_IPS` | `true` | Blocks downloads that resolve to private, loopback, link-local, or reserved addresses |
 | `MINECRAFT_TOOLKIT_HASH_REQUIRED` | `false` | Requires SHA-256 or SHA-512 for package downloads when enabled |
 | `MINECRAFT_TOOLKIT_MAX_ICON_BYTES` | `2097152` | Maximum server icon size |
 | `MINECRAFT_TOOLKIT_MAX_PACKAGE_BYTES` | `104857600` | Maximum package size |
 | `MINECRAFT_TOOLKIT_MAX_JAR_ENTRIES` | `20000` | Maximum number of entries accepted inside a downloaded JAR |
 | `MINECRAFT_TOOLKIT_MAX_JAR_ENTRY_BYTES` | `52428800` | Maximum uncompressed size for a single JAR entry |
-| `MINECRAFT_TOOLKIT_USER_AGENT` | `BlueIT-MinecraftToolkit/1.3.0` | User-Agent for external requests |
+| `MINECRAFT_TOOLKIT_USER_AGENT` | `BlueIT-MinecraftToolkit/1.3.5` | User-Agent for external requests |
 
 After changing environment values manually, clear cached configuration:
 
@@ -281,6 +307,8 @@ Users without the required permissions do not see the corresponding Toolkit page
 - JARs are rejected when an entry count or single-entry size exceeds configured limits.
 - SHA-512, SHA-256, or SHA-1 is verified when supplied by the source.
 - Administrators can require SHA-256 or SHA-512 for package downloads with `MINECRAFT_TOOLKIT_HASH_REQUIRED=true`.
+- Administrators can require root admin approval for startup edits, risky version changes, package removal, CurseForge usage, Crossplay setup, and raw `server.properties` editing.
+- Gated risky actions write security audit entries to the Toolkit log when `MINECRAFT_TOOLKIT_SECURITY_AUDIT_LOG_ENABLED=true`.
 - Existing files are backed up before replacement.
 - Technical exceptions are written to the Laravel log while the UI receives a short error message.
 
@@ -309,7 +337,7 @@ For Paper/Purpur crossplay, applying the Crossplay configuration also patches Ge
 - **Wings is unreachable:** verify node connectivity and credentials; Toolkit file actions intentionally stop instead of writing directly to node volumes.
 
 Logs for setup, installs, crossplay, checks, and updates are stored per server and shown on the Minecraft Overview page.
-The overview also lists source status cards for Modrinth, CurseForge, and Crossplay, plus recent Toolkit backup folders from `/.minecraft-toolkit/backups` so administrators can quickly find files created before setup, updates, removals, or version changes.
+The overview also lists source status cards for Modrinth, CurseForge, and Crossplay, an admin checklist for security-sensitive configuration, plus recent Toolkit backup folders from `/.minecraft-toolkit/backups` so administrators can quickly find files created before setup, updates, removals, or version changes. Known backup files can be restored from the overview while the server is stopped; the current target file is backed up before the restore is written.
 
 
 ## CurseForge backend handling

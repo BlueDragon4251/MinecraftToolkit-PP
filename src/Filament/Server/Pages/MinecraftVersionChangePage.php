@@ -179,17 +179,17 @@ class MinecraftVersionChangePage extends Page implements HasSchemas
             Notification::make()
                 ->title(trans('minecrafttoolkit::strings.version_change.check_complete'))
                 ->body(($this->report['blocking'] ?? 0) > 0
-                    ? "{$this->report['blocking']} Pakete blockieren einen sicheren Wechsel."
-                    : 'Für alle verwalteten Pakete wurde eine kompatible Strategie gefunden.')
+                    ? trans('minecrafttoolkit::strings.version_change.blocking_body', ['count' => $this->report['blocking']])
+                    : trans('minecrafttoolkit::strings.version_change.compatible_body'))
                 ->status(($this->report['blocking'] ?? 0) > 0 ? 'warning' : 'success')
                 ->send();
         } catch (MinecraftToolkitException $exception) {
             $this->report = null;
-            $this->notifyError('Kompatibilitätsprüfung fehlgeschlagen', $exception);
+            $this->notifyError(trans('minecrafttoolkit::strings.version_change.check_failed'), $exception);
         } catch (\Throwable $exception) {
             report($exception);
             $this->report = null;
-            $this->notifyUnexpectedError('Kompatibilitätsprüfung fehlgeschlagen');
+            $this->notifyUnexpectedError(trans('minecrafttoolkit::strings.version_change.check_failed'));
         }
     }
 
@@ -197,8 +197,8 @@ class MinecraftVersionChangePage extends Page implements HasSchemas
     {
         if ($this->report === null) {
             $this->notifyError(
-                'Versionswechsel nicht möglich',
-                new MinecraftToolkitException('Prüfe zuerst die Paketkompatibilität.')
+                trans('minecrafttoolkit::strings.version_change.change_not_possible'),
+                new MinecraftToolkitException(trans('minecrafttoolkit::strings.version_change.check_first'))
             );
 
             return;
@@ -207,16 +207,16 @@ class MinecraftVersionChangePage extends Page implements HasSchemas
         $state = $this->form->getState();
         if ($mode === 'remove' && !($state['confirm_remove'] ?? false)) {
             $this->notifyError(
-                'Bestätigung fehlt',
-                new MinecraftToolkitException('Bestätige zuerst das Sichern und Deaktivieren inkompatibler Pakete.')
+                trans('minecrafttoolkit::strings.version_change.confirmation_missing'),
+                new MinecraftToolkitException(trans('minecrafttoolkit::strings.version_change.confirm_remove_first'))
             );
 
             return;
         }
         if ($mode === 'risk' && !($state['confirm_risk'] ?? false)) {
             $this->notifyError(
-                'Bestätigung fehlt',
-                new MinecraftToolkitException('Bestätige ausdrücklich das Risiko dieses Versionswechsels.')
+                trans('minecrafttoolkit::strings.version_change.confirmation_missing'),
+                new MinecraftToolkitException(trans('minecrafttoolkit::strings.version_change.confirm_risk_first'))
             );
 
             return;
@@ -233,16 +233,20 @@ class MinecraftVersionChangePage extends Page implements HasSchemas
 
             Notification::make()
                 ->title(trans('minecrafttoolkit::strings.version_change.installed', ['version' => $result['setup']->minecraft_version]))
-                ->body("Pakete aktualisiert: {$result['updated']}, gesichert: {$result['removed']}, fehlgeschlagen: {$result['failed']}")
+                ->body(trans('minecrafttoolkit::strings.version_change.change_body', [
+                    'updated' => $result['updated'],
+                    'removed' => $result['removed'],
+                    'failed' => $result['failed'],
+                ]))
                 ->status($result['failed'] > 0 ? 'warning' : 'success')
                 ->persistent($result['failed'] > 0)
                 ->send();
             $this->redirect(static::getUrl(panel: 'server', tenant: $this->server()));
         } catch (MinecraftToolkitException $exception) {
-            $this->notifyError('Versionswechsel fehlgeschlagen', $exception);
+            $this->notifyError(trans('minecrafttoolkit::strings.version_change.change_failed'), $exception);
         } catch (\Throwable $exception) {
             report($exception);
-            $this->notifyUnexpectedError('Versionswechsel fehlgeschlagen');
+            $this->notifyUnexpectedError(trans('minecrafttoolkit::strings.version_change.change_failed'));
         }
     }
 
@@ -266,7 +270,7 @@ class MinecraftVersionChangePage extends Page implements HasSchemas
     {
         Notification::make()
             ->title($title)
-            ->body($exception->getMessage())
+            ->body($this->localizedExceptionBody($exception))
             ->danger()
             ->persistent()
             ->send();
@@ -276,9 +280,16 @@ class MinecraftVersionChangePage extends Page implements HasSchemas
     {
         Notification::make()
             ->title($title)
-            ->body('Eine externe Quelle oder Wings ist derzeit nicht erreichbar. Technische Details wurden protokolliert.')
+            ->body(trans('minecrafttoolkit::strings.common.unexpected_error_body'))
             ->danger()
             ->persistent()
             ->send();
+    }
+
+    private function localizedExceptionBody(MinecraftToolkitException $exception): string
+    {
+        return str_starts_with(strtolower((string) app()->getLocale()), 'de')
+            ? $exception->getMessage()
+            : trans('minecrafttoolkit::strings.common.action_failed_body');
     }
 }
