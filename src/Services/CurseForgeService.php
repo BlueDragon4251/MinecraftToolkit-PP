@@ -72,6 +72,86 @@ class CurseForgeService
         return $this->normalizeSearchResults($response['data'] ?? []);
     }
 
+    /** @return array<int, array<string, mixed>> */
+    public function searchModpacks(string $query = '', int $offset = 0, int $limit = 20): array
+    {
+        $this->assertEnabled();
+        $params = [
+            'gameId' => self::MINECRAFT_GAME_ID,
+            'classId' => 4471,
+            'sortField' => 2,
+            'sortOrder' => 'desc',
+            'index' => max(0, $offset),
+            'pageSize' => min(max($limit, 1), 50),
+        ];
+        if (trim($query) !== '') {
+            $params['searchFilter'] = trim($query);
+        }
+
+        $key = 'minecrafttoolkit.curseforge.modpacks.' . sha1(json_encode($params, JSON_THROW_ON_ERROR));
+        $response = Cache::remember(
+            $key,
+            now()->addMinutes(10),
+            fn (): array => $this->get('/mods/search', $params)
+        );
+
+        return $this->normalizeSearchResults($response['data'] ?? []);
+    }
+
+    /** @return array{project: array<string, mixed>, file: array<string, mixed>} */
+    public function modpackFile(string $projectId): array
+    {
+        $this->assertEnabled();
+        if (!ctype_digit($projectId) || (int) $projectId <= 0) {
+            throw new MinecraftToolkitException('Die CurseForge-Modpack-ID ist ungültig.');
+        }
+
+        $project = $this->project((int) $projectId);
+        $response = $this->get("/mods/$projectId/files", ['pageSize' => 50]);
+        $file = collect($response['data'] ?? [])
+            ->filter(fn (mixed $candidate): bool => is_array($candidate))
+            ->sortByDesc(fn (array $candidate): string => (string) ($candidate['fileDate'] ?? ''))
+            ->first();
+        if (!is_array($file)) {
+            throw new MinecraftToolkitException('Für dieses CurseForge-Modpack wurde keine Datei gefunden.');
+        }
+
+        $downloadUrl = is_string($file['downloadUrl'] ?? null) ? $file['downloadUrl'] : null;
+        if ($downloadUrl === null && isset($file['id'])) {
+            $download = $this->get("/mods/$projectId/files/{$file['id']}/download-url");
+            $downloadUrl = is_string($download['data'] ?? null) ? $download['data'] : null;
+        }
+        if ($downloadUrl === null) {
+            throw new MinecraftToolkitException('CurseForge liefert für dieses Modpack keine Download-URL.');
+        }
+
+        return [
+            'project' => $this->normalizeProject($project),
+            'file' => [
+                'id' => (string) ($file['id'] ?? ''),
+                'display_name' => (string) ($file['displayName'] ?? $file['fileName'] ?? 'CurseForge Modpack'),
+                'file_name' => (string) ($file['fileName'] ?? 'modpack.zip'),
+                'url' => $downloadUrl,
+                'hashes' => $this->normalizeHashes($file['hashes'] ?? []),
+            ],
+        ];
+    }
+
+    public function fileDownloadUrl(string $projectId, string $fileId): string
+    {
+        $this->assertEnabled();
+        if (!ctype_digit($projectId) || !ctype_digit($fileId)) {
+            throw new MinecraftToolkitException('Die CurseForge-Datei-ID ist ungültig.');
+        }
+
+        $download = $this->get("/mods/$projectId/files/$fileId/download-url");
+        if (!is_string($download['data'] ?? null) || trim($download['data']) === '') {
+            throw new MinecraftToolkitException('CurseForge liefert für eine Modpack-Datei keine Download-URL.');
+        }
+
+        return $download['data'];
+    }
+
     /** @return array{project: array<string, mixed>, version: array<string, mixed>, dependencies: array<int, array<string, mixed>>, warning: ?string} */
     public function installationCandidate(string $projectId, MinecraftToolkitSetup $setup): array
     {

@@ -20,6 +20,7 @@ class MinecraftPackageInstaller
         private readonly CurseForgeService $curseForge,
         private readonly MinecraftServerFileService $files,
         private readonly MinecraftServerStateService $state,
+        private readonly MinecraftRiskGateService $riskGate,
     ) {}
 
     public function installModrinthPlugin(Server $server, MinecraftToolkitSetup $setup, string $projectId): MinecraftToolkitPackage
@@ -37,6 +38,8 @@ class MinecraftPackageInstaller
         MinecraftToolkitSetup $setup,
         string $projectId
     ): MinecraftToolkitPackage {
+        $this->riskGate->assertAllowed('curseforge_usage', $server);
+
         return $this->installPackage($server, $setup, 'curseforge', $projectId);
     }
 

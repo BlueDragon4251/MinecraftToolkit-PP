@@ -9,7 +9,9 @@ use BackedEnum;
 use BlueWolf\MinecraftToolkit\Exceptions\MinecraftToolkitException;
 use BlueWolf\MinecraftToolkit\Filament\Server\Pages\MinecraftOverviewPage;
 use BlueWolf\MinecraftToolkit\Models\MinecraftToolkitSetup;
+use BlueWolf\MinecraftToolkit\Services\MinecraftModpackService;
 use BlueWolf\MinecraftToolkit\Services\MinecraftPermissionService;
+use BlueWolf\MinecraftToolkit\Services\MinecraftRiskGateService;
 use BlueWolf\MinecraftToolkit\Services\MinecraftSetupService;
 use BlueWolf\MinecraftToolkit\Services\MinecraftSoftwareService;
 use BlueWolf\MinecraftToolkit\Services\ModrinthService;
@@ -18,6 +20,7 @@ use Filament\Facades\Filament;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Placeholder;
+use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
@@ -128,6 +131,16 @@ class MinecraftSetupPage extends Page implements HasSchemas
                     ->label(trans('minecrafttoolkit::strings.setup.software'))
                     ->icon('tabler-box')
                     ->schema([
+                        Select::make('setup_template')
+                            ->label(trans('minecrafttoolkit::strings.setup.template'))
+                            ->options(fn (): array => $this->setupTemplateOptions())
+                            ->placeholder(trans('minecrafttoolkit::strings.setup.template_custom'))
+                            ->live()
+                            ->dehydrated(false)
+                            ->afterStateUpdated(function (?string $state, Set $set): void {
+                                $this->applySetupTemplate($state, $set);
+                            })
+                            ->helperText(trans('minecrafttoolkit::strings.setup.template_help')),
                         Select::make('software')
                             ->label(trans('minecrafttoolkit::strings.setup.software'))
                             ->options(app(MinecraftSoftwareService::class)->supportedSoftware())
@@ -136,6 +149,7 @@ class MinecraftSetupPage extends Page implements HasSchemas
                                 $set('minecraft_version', null);
                                 $set('loader_version', null);
                                 $set('crossplay_enabled', false);
+                                $set('setup_package_profile', null);
                                 $set('setup_package_ids', []);
                                 $this->selectedSetupPackageIds = [];
                                 $this->setupPackagePage = 0;
@@ -288,7 +302,7 @@ class MinecraftSetupPage extends Page implements HasSchemas
                             ->required(fn (Get $get): bool => (bool) $get('crossplay_enabled'))
                             ->visible(fn (Get $get): bool => (bool) $get('crossplay_enabled'))
                             ->helperText(trans('minecrafttoolkit::strings.setup.bedrock_allocation_help')),
-                        Section::make('Hinweis')
+                        Section::make(trans('minecrafttoolkit::strings.setup.hint'))
                             ->description(trans('minecrafttoolkit::strings.setup.crossplay_desc'))
                             ->schema([]),
                     ]),
@@ -310,6 +324,16 @@ class MinecraftSetupPage extends Page implements HasSchemas
                                 $this->resetSetupPackageBrowser();
                             })
                             ->helperText(trans('minecrafttoolkit::strings.setup.packages_help')),
+                        Select::make('setup_package_profile')
+                            ->label(trans('minecrafttoolkit::strings.setup.package_profile'))
+                            ->options(fn (Get $get): array => $this->packageProfileOptions((string) $get('software')))
+                            ->placeholder(trans('minecrafttoolkit::strings.setup.package_profile_custom'))
+                            ->live()
+                            ->dehydrated(false)
+                            ->afterStateUpdated(function (?string $state): void {
+                                $this->applyPackageProfile($state);
+                            })
+                            ->helperText(trans('minecrafttoolkit::strings.setup.package_profile_help')),
                         TextInput::make('setup_package_query')
                             ->label(trans('minecrafttoolkit::strings.installer.search', ['package' => trans('minecrafttoolkit::strings.setup.packages')]))
                             ->placeholder(trans('minecrafttoolkit::strings.installer.project_placeholder'))
@@ -323,6 +347,19 @@ class MinecraftSetupPage extends Page implements HasSchemas
                         Hidden::make('setup_package_ids')
                             ->default([])
                             ->dehydrated(true),
+                        FileUpload::make('setup_modpack_upload')
+                            ->label(trans('minecrafttoolkit::strings.setup.modpack_upload'))
+                            ->acceptedFileTypes(['application/zip', 'application/octet-stream'])
+                            ->storeFiles(false)
+                            ->helperText(trans('minecrafttoolkit::strings.setup.modpack_upload_help')),
+                        Radio::make('setup_modpack_mode')
+                            ->label(trans('minecrafttoolkit::strings.setup.modpack_mode'))
+                            ->options([
+                                'combine' => trans('minecrafttoolkit::strings.modpacks.combine'),
+                                'replace' => trans('minecrafttoolkit::strings.modpacks.replace'),
+                            ])
+                            ->default('combine')
+                            ->required(),
                         Placeholder::make('setup_package_browser')
                             ->label(trans('minecrafttoolkit::strings.setup.package_browser'))
                             ->content(fn (Get $get): HtmlString => new HtmlString($this->renderSetupPackageBrowser($get)))
@@ -332,7 +369,7 @@ class MinecraftSetupPage extends Page implements HasSchemas
                     ->label(trans('minecrafttoolkit::strings.setup.review'))
                     ->icon('tabler-list-check')
                     ->schema([
-                        Section::make('Bereit für das Setup')
+                        Section::make(trans('minecrafttoolkit::strings.setup.ready'))
                             ->description(function (Get $get): string {
                                 $software = (string) $get('software');
                                 $artifact = match ($software) {
@@ -342,13 +379,12 @@ class MinecraftSetupPage extends Page implements HasSchemas
                                     default => 'server.jar',
                                 };
 
-                                return sprintf(
-                                    '%s %s wird über %s eingerichtet. Port %s kommt aus der primären Allocation; vorhandene Zieldateien werden gesichert.',
-                                    app(MinecraftSoftwareService::class)->supportedSoftware()[$software] ?? 'Minecraft',
-                                    trim(($get('minecraft_version') ?: '') . ' ' . ($get('loader_version') ?: '')),
-                                    $artifact,
-                                    Filament::getTenant()?->allocation?->port ?? 'fehlt'
-                                );
+                                return trans('minecrafttoolkit::strings.setup.ready_desc', [
+                                    'software' => app(MinecraftSoftwareService::class)->supportedSoftware()[$software] ?? 'Minecraft',
+                                    'version' => trim(($get('minecraft_version') ?: '') . ' ' . ($get('loader_version') ?: '')),
+                                    'artifact' => $artifact,
+                                    'port' => Filament::getTenant()?->allocation?->port ?? trans('minecrafttoolkit::strings.common.missing'),
+                                ]);
                             })
                             ->schema([
                                 Hidden::make('review_confirmed')->default(true),
@@ -367,25 +403,44 @@ class MinecraftSetupPage extends Page implements HasSchemas
             $state = $this->form->getState();
             $state['setup_package_ids'] = $this->normalizedSelectedSetupPackageIds($state['setup_package_ids'] ?? []);
             $icon = $state['server_icon'] ?? null;
+            $modpackUpload = $state['setup_modpack_upload'] ?? null;
+            if (is_array($modpackUpload)) {
+                $modpackUpload = reset($modpackUpload) ?: null;
+            }
+            $modpackMode = (string) ($state['setup_modpack_mode'] ?? 'combine');
             $usesBootstrapInstaller = in_array($state['software'] ?? null, ['forge', 'neoforge', 'bedrock'], true);
             unset(
                 $state['server_icon'],
+                $state['setup_modpack_upload'],
+                $state['setup_modpack_mode'],
                 $state['review_confirmed'],
                 $state['motd_formatter_text'],
                 $state['motd_formatter_color'],
                 $state['motd_formatter_bold'],
                 $state['motd_formatter_italic'],
                 $state['motd_formatter_underlined'],
+                $state['setup_template'],
+                $state['setup_package_profile'],
                 $state['setup_package_query']
             );
 
             app(MinecraftSetupService::class)->setup($server, $state, $icon);
+            if ($modpackUpload !== null) {
+                $setup = MinecraftToolkitSetup::query()
+                    ->where('server_uuid', $server->uuid)
+                    ->where('setup_status', 'completed')
+                    ->latest('id')
+                    ->first();
+                if ($setup instanceof MinecraftToolkitSetup) {
+                    app(MinecraftModpackService::class)->installUpload($server, $setup, $modpackUpload, $modpackMode);
+                }
+            }
 
             Notification::make()
                 ->title(trans('minecrafttoolkit::strings.setup.complete'))
                 ->body($usesBootstrapInstaller
-                    ? 'Der Loader-Installer liegt bereit. Beim ersten Start werden die Laufzeitdateien erzeugt; das kann einige Minuten dauern.'
-                    : 'Serversoftware, eula.txt und server.properties wurden über Wings eingerichtet.')
+                    ? trans('minecrafttoolkit::strings.setup.complete_installer_body')
+                    : trans('minecrafttoolkit::strings.setup.complete_body'))
                 ->success()
                 ->send();
 
@@ -393,17 +448,25 @@ class MinecraftSetupPage extends Page implements HasSchemas
         } catch (MinecraftToolkitException $exception) {
             Notification::make()
                 ->title(trans('minecrafttoolkit::strings.setup.failed'))
-                ->body($exception->getMessage())
+                ->body($this->localizedExceptionBody($exception))
                 ->danger()
                 ->persistent()
                 ->send();
         }
     }
 
+    private function localizedExceptionBody(MinecraftToolkitException $exception): string
+    {
+        return str_starts_with(strtolower((string) app()->getLocale()), 'de')
+            ? $exception->getMessage()
+            : trans('minecrafttoolkit::strings.common.action_failed_body');
+    }
+
     private function defaults(): array
     {
         return [
             'software' => null,
+            'setup_template' => null,
             'loader_version' => null,
             'motd' => 'A Minecraft Server',
             'level_name' => 'world',
@@ -429,9 +492,102 @@ class MinecraftSetupPage extends Page implements HasSchemas
             'motd_formatter_italic' => false,
             'motd_formatter_underlined' => false,
             'setup_package_source' => 'modrinth',
+            'setup_package_profile' => null,
             'setup_package_ids' => [],
             'setup_package_query' => '',
+            'setup_modpack_upload' => null,
+            'setup_modpack_mode' => 'combine',
         ];
+    }
+
+    /** @return array<string, string> */
+    private function setupTemplateOptions(): array
+    {
+        return collect(config('minecrafttoolkit.setup_templates', []))
+            ->filter(fn (mixed $template): bool => is_array($template) && is_string($template['label'] ?? null))
+            ->mapWithKeys(fn (array $template, string $key): array => [
+                $key => (string) $template['label'],
+            ])
+            ->all();
+    }
+
+    private function applySetupTemplate(?string $templateKey, Set $set): void
+    {
+        $template = config("minecrafttoolkit.setup_templates.$templateKey");
+        if (!is_array($template)) {
+            return;
+        }
+
+        foreach ([
+            'software',
+            'motd',
+            'level_name',
+            'max_players',
+            'gamemode',
+            'difficulty',
+            'online_mode',
+            'whitelist',
+            'pvp',
+            'allow_nether',
+            'spawn_protection',
+            'view_distance',
+            'simulation_distance',
+            'enable_command_block',
+            'allow_flight',
+            'enable_query',
+            'enable_rcon',
+            'crossplay_enabled',
+        ] as $field) {
+            if (array_key_exists($field, $template)) {
+                $set($field, $template[$field]);
+            }
+        }
+
+        $set('minecraft_version', null);
+        $set('loader_version', null);
+        $set('bedrock_allocation_id', null);
+        $set('setup_package_profile', null);
+        $set('setup_package_ids', []);
+        $this->selectedSetupPackageIds = [];
+        $this->setupPackagePage = 0;
+        $this->resetSetupPackageBrowser();
+    }
+
+    /** @return array<string, string> */
+    private function packageProfileOptions(string $software): array
+    {
+        return collect(config('minecrafttoolkit.package_profiles', []))
+            ->filter(function (mixed $profile) use ($software): bool {
+                if (!is_array($profile) || !is_string($profile['label'] ?? null)) {
+                    return false;
+                }
+
+                $supportedSoftware = is_array($profile['software'] ?? null) ? $profile['software'] : [];
+
+                return $software !== '' && in_array($software, $supportedSoftware, true);
+            })
+            ->mapWithKeys(fn (array $profile, string $key): array => [
+                $key => (string) $profile['label'],
+            ])
+            ->all();
+    }
+
+    private function applyPackageProfile(?string $profileKey): void
+    {
+        $profile = config("minecrafttoolkit.package_profiles.$profileKey");
+        if (!is_array($profile) || !is_array($profile['packages'] ?? null)) {
+            return;
+        }
+
+        $packages = array_values(array_filter(
+            array_map('strval', $profile['packages']),
+            fn (string $id): bool => $id !== '' && str_contains($id, ':')
+        ));
+        $this->selectedSetupPackageIds = array_values(array_unique(array_merge(
+            $this->selectedSetupPackageIds,
+            $packages
+        )));
+        $this->data['setup_package_ids'] = $this->selectedSetupPackageIds;
     }
 
     /** @return array<string, string> */
@@ -487,7 +643,9 @@ class MinecraftSetupPage extends Page implements HasSchemas
         if ((bool) config('minecrafttoolkit.modrinth_enabled', true)) {
             $options['modrinth'] = 'Modrinth';
         }
-        if ((bool) config('minecrafttoolkit.curseforge_enabled', false) && app(CurseForgeService::class)->isConfigured()) {
+        if ((bool) config('minecrafttoolkit.curseforge_enabled', false)
+            && app(CurseForgeService::class)->isConfigured()
+            && app(MinecraftRiskGateService::class)->isAllowed('curseforge_usage', $this->server())) {
             $options['curseforge'] = 'CurseForge';
         }
 
@@ -642,6 +800,14 @@ class MinecraftSetupPage extends Page implements HasSchemas
         return in_array($sourceProjectId, $this->selectedSetupPackageIds, true);
     }
 
+    private function server(): Server
+    {
+        /** @var Server $server */
+        $server = Filament::getTenant();
+
+        return $server;
+    }
+
     /** @param mixed $statePackageIds
      *  @return array<int, string>
      */
@@ -668,6 +834,9 @@ class MinecraftSetupPage extends Page implements HasSchemas
             }
 
             $source = (string) ($this->data['setup_package_source'] ?? 'modrinth');
+            if ($source === 'curseforge') {
+                app(MinecraftRiskGateService::class)->assertAllowed('curseforge_usage', $this->server());
+            }
             if ($source === 'curseforge' && !app(CurseForgeService::class)->isConfigured()) {
                 $this->setupPackageResults = [];
                 $this->setupPackageResultsTitle = trans('minecrafttoolkit::strings.installer.missing_proxy');

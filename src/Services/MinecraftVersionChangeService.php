@@ -23,6 +23,7 @@ class MinecraftVersionChangeService
         private readonly MinecraftUpdateService $updates,
         private readonly MinecraftServerFileService $files,
         private readonly MinecraftServerStateService $state,
+        private readonly MinecraftRiskGateService $riskGate,
     ) {}
 
     /**
@@ -41,6 +42,12 @@ class MinecraftVersionChangeService
         if ($minecraftVersion === $setup->minecraft_version
             && ($loaderVersion ?? null) === ($setup->loader_version ?? null)) {
             throw new MinecraftToolkitException('Wähle eine andere Minecraft- oder Loader-Version.');
+        }
+        if ($mode === 'risk') {
+            $this->riskGate->assertAllowed('version_risk', $server);
+        }
+        if ($mode === 'remove') {
+            $this->riskGate->assertAllowed('package_removal', $server);
         }
 
         /** @var Lock $lock */
@@ -304,6 +311,8 @@ class MinecraftVersionChangeService
         if ($startup === null) {
             return;
         }
+
+        $this->riskGate->assertAllowed('startup_edits', $server);
 
         $user = user();
         if ($user === null || (!$user->isRootAdmin()

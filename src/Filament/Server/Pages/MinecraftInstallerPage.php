@@ -11,6 +11,7 @@ use BlueWolf\MinecraftToolkit\Models\MinecraftToolkitPackage;
 use BlueWolf\MinecraftToolkit\Models\MinecraftToolkitSetup;
 use BlueWolf\MinecraftToolkit\Services\MinecraftPackageInstaller;
 use BlueWolf\MinecraftToolkit\Services\MinecraftPermissionService;
+use BlueWolf\MinecraftToolkit\Services\MinecraftRiskGateService;
 use BlueWolf\MinecraftToolkit\Services\ModrinthService;
 use BlueWolf\MinecraftToolkit\Services\CurseForgeService;
 use Filament\Facades\Filament;
@@ -206,6 +207,9 @@ class MinecraftInstallerPage extends Page implements HasSchemas
             $state = $this->form->getState();
             $query = trim((string) ($state['query'] ?? ''));
             $source = $this->selectedSource();
+            if ($source === 'curseforge') {
+                app(MinecraftRiskGateService::class)->assertAllowed('curseforge_usage', $this->server());
+            }
             $this->candidate = null;
             $offset = $this->resultPage * 20;
             $popular = $forcePopular || $query === '';
@@ -239,6 +243,9 @@ class MinecraftInstallerPage extends Page implements HasSchemas
     {
         try {
             $source = $this->selectedSource();
+            if ($source === 'curseforge') {
+                app(MinecraftRiskGateService::class)->assertAllowed('curseforge_usage', $this->server());
+            }
             $candidate = match ($source) {
                 'modrinth' => app(ModrinthService::class)->installationCandidate($projectId, $this->setup()),
                 'curseforge' => app(CurseForgeService::class)->installationCandidate($projectId, $this->setup()),
@@ -383,6 +390,7 @@ class MinecraftInstallerPage extends Page implements HasSchemas
                 'project_name' => $package->project_name,
                 'version_number' => $package->version_number,
                 'file_name' => $package->file_name,
+                'file_path' => $package->file_path,
                 'source' => $package->source,
                 'managed' => $package->managed,
                 'installed_at' => $package->installed_at?->diffForHumans(),
@@ -428,7 +436,8 @@ class MinecraftInstallerPage extends Page implements HasSchemas
 
     public function curseForgeConfigured(): bool
     {
-        return app(CurseForgeService::class)->isConfigured();
+        return app(CurseForgeService::class)->isConfigured()
+            && app(MinecraftRiskGateService::class)->isAllowed('curseforge_usage', $this->server());
     }
 
     public function hasUsableSource(): bool
@@ -460,9 +469,16 @@ class MinecraftInstallerPage extends Page implements HasSchemas
     {
         Notification::make()
             ->title($title)
-            ->body($exception->getMessage())
+            ->body($this->localizedExceptionBody($exception))
             ->danger()
             ->persistent()
             ->send();
+    }
+
+    private function localizedExceptionBody(MinecraftToolkitException $exception): string
+    {
+        return str_starts_with(strtolower((string) app()->getLocale()), 'de')
+            ? $exception->getMessage()
+            : trans('minecrafttoolkit::strings.common.action_failed_body');
     }
 }

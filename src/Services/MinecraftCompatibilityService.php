@@ -8,6 +8,7 @@ use App\Models\Server;
 use BlueWolf\MinecraftToolkit\Exceptions\MinecraftToolkitException;
 use BlueWolf\MinecraftToolkit\Models\MinecraftToolkitPackage;
 use BlueWolf\MinecraftToolkit\Models\MinecraftToolkitSetup;
+use Illuminate\Support\Facades\Cache;
 
 class MinecraftCompatibilityService
 {
@@ -32,6 +33,34 @@ class MinecraftCompatibilityService
         string $minecraftVersion,
         ?string $loaderVersion
     ): array {
+        $this->assertTargetAvailable($setup, $minecraftVersion, $loaderVersion);
+
+        $target = $this->targetSetup($setup, $minecraftVersion, $loaderVersion);
+        $packages = $this->compatiblePackages($server);
+        $cacheKey = $this->cacheKey($server, $target, $packages);
+        $ttl = max(0, (int) config('minecrafttoolkit.compatibility_cache_minutes', 30));
+        if ($ttl <= 0) {
+            return $this->buildReport($target, $packages, false);
+        }
+
+        $cached = Cache::get($cacheKey);
+        if (is_array($cached)) {
+            $cached['cached'] = true;
+
+            return $cached;
+        }
+
+        $report = $this->buildReport($target, $packages, false);
+        Cache::put($cacheKey, $report, now()->addMinutes($ttl));
+
+        return $report;
+    }
+
+    private function assertTargetAvailable(
+        MinecraftToolkitSetup $setup,
+        string $minecraftVersion,
+        ?string $loaderVersion
+    ): void {
         if (!array_key_exists($minecraftVersion, $this->software->versionOptions($setup->software))) {
             throw new MinecraftToolkitException('Die gewählte Minecraft-Version ist nicht verfügbar.');
         }
@@ -43,14 +72,32 @@ class MinecraftCompatibilityService
                 ))) {
             throw new MinecraftToolkitException('Wähle eine gültige Loader-Version für das Ziel.');
         }
+    }
 
-        $target = $this->targetSetup($setup, $minecraftVersion, $loaderVersion);
-        $packages = MinecraftToolkitPackage::query()
+    /** @return \Illuminate\Database\Eloquent\Collection<int, MinecraftToolkitPackage> */
+    private function compatiblePackages(Server $server)
+    {
+        return MinecraftToolkitPackage::query()
             ->where('server_uuid', $server->uuid)
             ->where('enabled', true)
             ->whereIn('package_type', ['plugin', 'mod', 'dependency', 'crossplay'])
             ->orderBy('project_name')
-            ->get()
+            ->get();
+    }
+
+    /**
+     * @param \Illuminate\Database\Eloquent\Collection<int, MinecraftToolkitPackage> $packageRecords
+     * @return array{
+     *   target: array<string, mixed>,
+     *   packages: array<int, array<string, mixed>>,
+     *   blocking: int,
+     *   updates: int,
+     *   cached: bool
+     * }
+     */
+    private function buildReport(MinecraftToolkitSetup $target, $packageRecords, bool $cached): array
+    {
+        $packages = $packageRecords
             ->map(fn (MinecraftToolkitPackage $package): array => $this->checkPackage($package, $target))
             ->all();
 
@@ -63,7 +110,36 @@ class MinecraftCompatibilityService
             'packages' => $packages,
             'blocking' => collect($packages)->whereIn('status', ['incompatible', 'unknown', 'pinned'])->count(),
             'updates' => collect($packages)->whereIn('status', ['update_required', 'system_update'])->count(),
+            'cached' => $cached,
         ];
+    }
+
+    /** @param \Illuminate\Database\Eloquent\Collection<int, MinecraftToolkitPackage> $packages */
+    private function cacheKey(Server $server, MinecraftToolkitSetup $target, $packages): string
+    {
+        $fingerprint = $packages
+            ->map(fn (MinecraftToolkitPackage $package): array => [
+                'id' => $package->id,
+                'source' => $package->source,
+                'project' => $package->source_project_id,
+                'version' => $package->source_version_id,
+                'package_version' => $package->version_number,
+                'pinned' => (bool) $package->update_pinned,
+                'enabled' => (bool) $package->enabled,
+                'updated_at' => optional($package->updated_at)->timestamp,
+            ])
+            ->values()
+            ->all();
+
+        return 'minecrafttoolkit.compatibility.'
+            . $server->uuid . '.'
+            . sha1(json_encode([
+                'software' => $target->software,
+                'minecraft_version' => $target->minecraft_version,
+                'loader' => $target->loader,
+                'loader_version' => $target->loader_version,
+                'packages' => $fingerprint,
+            ], JSON_THROW_ON_ERROR));
     }
 
     public function targetSetup(

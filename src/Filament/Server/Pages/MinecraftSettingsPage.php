@@ -11,6 +11,7 @@ use BlueWolf\MinecraftToolkit\Models\MinecraftToolkitSetup;
 use BlueWolf\MinecraftToolkit\Services\MinecraftPermissionService;
 use BlueWolf\MinecraftToolkit\Services\MinecraftCrossplayService;
 use BlueWolf\MinecraftToolkit\Services\MinecraftPropertiesService;
+use BlueWolf\MinecraftToolkit\Services\MinecraftRiskGateService;
 use BlueWolf\MinecraftToolkit\Services\MinecraftServerFileService;
 use BlueWolf\MinecraftToolkit\Services\MinecraftServerStateService;
 use Filament\Facades\Filament;
@@ -132,22 +133,22 @@ class MinecraftSettingsPage extends Page implements HasSchemas
                     Toggle::make('pvp')->label('PVP'),
                     Toggle::make('allow_flight')->label(trans('minecrafttoolkit::strings.setup.allow_flight')),
                 ]),
-            Section::make('Alle server.properties Werte')
-                ->description('Wähle eine Seite aus. Die Felder decken die normalen Java-server.properties ab; unbekannte Werte bleiben zusätzlich im Rohtext erhalten.')
+            Section::make(trans('minecrafttoolkit::strings.settings_page.properties_all_values'))
+                ->description(trans('minecrafttoolkit::strings.settings_page.properties_all_values_desc'))
                 ->columns(2)
                 ->schema([
                     Select::make('properties_page')
-                        ->label('Eigenschaften-Seite')
+                        ->label(trans('minecrafttoolkit::strings.settings_page.properties_page'))
                         ->options($this->propertyPageOptions())
                         ->default('basic')
                         ->live()
                         ->columnSpanFull(),
                     ...$this->propertyPageFields(),
                     Textarea::make('server_properties_raw')
-                        ->label('Vollständige server.properties / Rohtext')
+                        ->label(trans('minecrafttoolkit::strings.settings_page.properties_raw'))
                         ->rows(18)
                         ->columnSpanFull()
-                        ->helperText('Erweiterte Ansicht für seltene oder zukünftige Werte. Beim Speichern werden die Felder oben in diesen Rohtext übernommen.'),
+                        ->helperText(trans('minecrafttoolkit::strings.settings_page.properties_raw_help')),
                 ]),
             Section::make('Crossplay')
                 ->description(trans('minecrafttoolkit::strings.settings_page.crossplay_desc'))
@@ -342,7 +343,11 @@ class MinecraftSettingsPage extends Page implements HasSchemas
             $files = app(MinecraftServerFileService::class);
             $propertiesService = app(MinecraftPropertiesService::class);
             $rawProperties = is_string($data['server_properties_raw'] ?? null) ? (string) $data['server_properties_raw'] : '';
-            $current = $rawProperties !== '' ? $rawProperties : $files->read($server, '/server.properties', 1048576);
+            $storedProperties = $files->read($server, '/server.properties', 1048576);
+            if ($rawProperties !== '' && $rawProperties !== $storedProperties) {
+                app(MinecraftRiskGateService::class)->assertAllowed('raw_properties', $server);
+            }
+            $current = $rawProperties !== '' ? $rawProperties : $storedProperties;
             $allChanges = array_merge($changes, $this->normalizeKnownPropertiesForSave($data['properties'] ?? []));
             $files->write($server, '/server.properties', $propertiesService->patch($current, $allChanges));
             $setup->fill(collect($data)->except('bedrock_allocation_id', 'server_properties_raw', 'properties', 'properties_page')->all())->save();
@@ -373,8 +378,8 @@ class MinecraftSettingsPage extends Page implements HasSchemas
             Notification::make()
                 ->title(trans('minecrafttoolkit::strings.settings_page.crossplay_installed'))
                 ->body($configured
-                    ? 'Geyser verwendet Floodgate und den ausgewählten Bedrock-Port.'
-                    : 'Starte den Server einmal und klicke danach auf „Crossplay-Konfiguration anwenden“.')
+                    ? trans('minecrafttoolkit::strings.settings_page.crossplay_configured_body')
+                    : trans('minecrafttoolkit::strings.settings_page.crossplay_needs_first_start_body'))
                 ->success()
                 ->persistent(!$configured)
                 ->send();
@@ -389,7 +394,7 @@ class MinecraftSettingsPage extends Page implements HasSchemas
             app(MinecraftCrossplayService::class)->applyConfig($this->server(), $this->setup());
             Notification::make()
                 ->title(trans('minecrafttoolkit::strings.settings_page.crossplay_config_applied'))
-                ->body('Geyser verwendet jetzt Floodgate und den ausgewählten Bedrock-Port.')
+                ->body(trans('minecrafttoolkit::strings.settings_page.crossplay_config_applied_body'))
                 ->success()
                 ->send();
         } catch (MinecraftToolkitException $exception) {
@@ -459,9 +464,16 @@ class MinecraftSettingsPage extends Page implements HasSchemas
     {
         Notification::make()
             ->title(trans('minecrafttoolkit::strings.settings_page.crossplay_failed'))
-            ->body($exception->getMessage())
+            ->body($this->localizedExceptionBody($exception))
             ->danger()
             ->persistent()
             ->send();
+    }
+
+    private function localizedExceptionBody(MinecraftToolkitException $exception): string
+    {
+        return str_starts_with(strtolower((string) app()->getLocale()), 'de')
+            ? $exception->getMessage()
+            : trans('minecrafttoolkit::strings.common.action_failed_body');
     }
 }

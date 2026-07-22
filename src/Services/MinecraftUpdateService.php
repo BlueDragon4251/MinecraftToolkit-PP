@@ -21,6 +21,7 @@ class MinecraftUpdateService
         private readonly ModrinthService $modrinth,
         private readonly CurseForgeService $curseForge,
         private readonly GeyserDownloadService $geyser,
+        private readonly MinecraftSoftwareService $software,
         private readonly MinecraftServerFileService $files,
         private readonly MinecraftServerStateService $state,
         private readonly MinecraftPackageInstaller $installer,
@@ -52,8 +53,7 @@ class MinecraftUpdateService
                 }
 
                 $candidate = $this->candidate($package, $setup);
-                $sameVersion = $candidate['version_id'] === $package->source_version_id
-                    && $this->versionsEquivalent($candidate['version_number'], (string) $package->version_number);
+                $sameVersion = $this->sameCandidateVersion($package, $candidate);
                 $status = $sameVersion ? 'up_to_date' : 'update_available';
                 $message = $status === 'up_to_date'
                     ? 'Das Paket ist aktuell.'
@@ -93,6 +93,9 @@ class MinecraftUpdateService
         if ($package->update_pinned) {
             throw new MinecraftToolkitException('Dieses Paket ist gepinnt. Hebe den Pin auf, bevor du es aktualisierst.');
         }
+        if ($this->isServerArtifact($package)) {
+            return $this->updateServerPackage($server, $setup, $package);
+        }
 
         /** @var Lock $lock */
         $lock = Cache::lock("minecrafttoolkit.update.{$server->uuid}", 600);
@@ -105,8 +108,7 @@ class MinecraftUpdateService
             $this->state->assertOffline($server);
             $package = $this->syncPackageWithInstalledState($server, $package);
             $candidate = $this->candidateFromLatestUpdateCheck($package) ?? $this->candidate($package, $setup);
-            if ($candidate['version_id'] === $package->source_version_id
-                && $this->versionsEquivalent($candidate['version_number'], (string) $package->version_number)) {
+            if ($this->sameCandidateVersion($package, $candidate)) {
                 $this->storeCheck($package, 'up_to_date', 'Das Paket ist bereits aktuell.', $candidate);
 
                 return $package;
@@ -312,6 +314,23 @@ class MinecraftUpdateService
             return ['status' => 'error', 'message' => $message, 'metadata' => []];
         }
 
+        if (!$this->isJarPackage($package)) {
+            $metadata = [
+                'file_path' => $package->file_path,
+                'file_name' => $package->file_name,
+                'package_type' => $package->package_type,
+            ];
+            $message = 'Datei vorhanden. Für diese verwaltete Datei ist keine JAR-Metadatenprüfung nötig.';
+            $this->storeCheck($package, 'verified', $message);
+            $this->log($server, 'package_verified', 'success', $message, [
+                'package_id' => $package->id,
+                'file_path' => $package->file_path,
+                'package_type' => $package->package_type,
+            ]);
+
+            return ['status' => 'verified', 'message' => $message, 'metadata' => $metadata];
+        }
+
         try {
             $contents = $this->files->read(
                 $server,
@@ -328,7 +347,7 @@ class MinecraftUpdateService
             }
 
             $message = sprintf(
-                'Datei verifiziert. SHA-512: %s, Groesse: %d Bytes.',
+                'Datei verifiziert. SHA-512: %s, Größe: %d Bytes.',
                 substr((string) $metadata['sha512'], 0, 16) . '...',
                 (int) $metadata['size']
             );
@@ -467,6 +486,10 @@ class MinecraftUpdateService
     /** @return array<string, mixed> */
     public function candidate(MinecraftToolkitPackage $package, MinecraftToolkitSetup $setup): array
     {
+        if ($this->isServerArtifact($package)) {
+            return $this->serverCandidate($package, $setup);
+        }
+
         if ($package->source === 'modrinth') {
             $candidate = $this->modrinth->updateCandidate($package->source_project_id, $setup);
 
@@ -487,6 +510,190 @@ class MinecraftUpdateService
         }
 
         throw new MinecraftToolkitException('Für diese Paketquelle ist keine automatische Updateprüfung verfügbar.');
+    }
+
+    private function updateServerPackage(
+        Server $server,
+        MinecraftToolkitSetup $setup,
+        MinecraftToolkitPackage $package
+    ): MinecraftToolkitPackage {
+        /** @var Lock $lock */
+        $lock = Cache::lock("minecrafttoolkit.server-update.{$server->uuid}", 600);
+        if (!$lock->get()) {
+            throw new MinecraftToolkitException('Für diesen Server läuft bereits ein Server-Update.');
+        }
+
+        $candidate = null;
+        try {
+            $this->state->assertOffline($server);
+            $candidate = $this->candidateFromLatestUpdateCheck($package) ?? $this->serverCandidate($package, $setup);
+            if ($this->sameCandidateVersion($package, $candidate)) {
+                $this->storeCheck($package, 'up_to_date', 'Die Server-Datei ist bereits aktuell.', $candidate);
+
+                return $package;
+            }
+
+            $oldPath = $package->file_path;
+            $newPath = $this->serverTargetPath($package, $candidate);
+            if ($newPath !== $oldPath && $this->files->exists($server, $newPath)) {
+                throw new MinecraftToolkitException("Die neue Server-Datei {$candidate['file_name']} existiert bereits.");
+            }
+
+            $backup = $this->files->backupIfPresent($server, $oldPath);
+            $metadata = [];
+            try {
+                if (strtolower(pathinfo((string) $candidate['file_name'], PATHINFO_EXTENSION)) === 'zip') {
+                    $metadata = $this->files->downloadFile($server, (string) $candidate['url'], (string) $candidate['file_name'], ['zip']);
+                } else {
+                    $metadata = $this->files->downloadJarWithMetadata(
+                        $server,
+                        (string) $candidate['url'],
+                        $newPath,
+                        is_array($candidate['hashes'] ?? null) ? $candidate['hashes'] : []
+                    );
+                }
+
+                if (!$this->files->exists($server, $newPath)) {
+                    throw new MinecraftToolkitException('Das Server-Update wurde vom Dateisystem nicht bestätigt.');
+                }
+                if ($newPath !== $oldPath && $this->files->exists($server, $oldPath)) {
+                    throw new MinecraftToolkitException('Die alte Server-Datei ist nach dem Update noch vorhanden. Das Update wurde abgebrochen.');
+                }
+            } catch (\Throwable $exception) {
+                if ($backup !== null) {
+                    try {
+                        if ($this->files->exists($server, $newPath)) {
+                            $this->files->delete($server, $newPath);
+                        }
+                        $this->files->move($server, $backup, $oldPath);
+                    } catch (\Throwable $restoreException) {
+                        Log::error('Minecraft Toolkit could not restore a server artifact backup.', [
+                            'server_uuid' => $server->uuid,
+                            'package_id' => $package->id,
+                            'exception' => $restoreException,
+                        ]);
+                    }
+                }
+
+                throw $exception;
+            }
+
+            $oldVersionId = $package->source_version_id;
+            $oldVersionNumber = $package->version_number;
+            $package->forceFill([
+                'source' => (string) ($candidate['source'] ?? $package->source),
+                'source_project_id' => (string) ($candidate['project_id'] ?? $package->source_project_id),
+                'source_version_id' => (string) $candidate['version_id'],
+                'version_number' => (string) $candidate['version_number'],
+                'file_name' => (string) $candidate['file_name'],
+                'file_path' => $newPath,
+                'download_url' => (string) $candidate['url'],
+                'sha1' => $metadata['sha1'] ?? ($candidate['hashes']['sha1'] ?? null),
+                'sha512' => $metadata['sha512'] ?? ($candidate['hashes']['sha512'] ?? null),
+                'dependencies_json' => is_array($candidate['dependencies'] ?? null) ? $candidate['dependencies'] : [],
+                'minecraft_version' => (string) ($candidate['minecraft_version'] ?? $setup->minecraft_version),
+                'loader' => (string) ($candidate['loader'] ?? $setup->loader ?? $setup->software),
+                'installed_at' => now(),
+                'last_checked_at' => now(),
+            ])->save();
+
+            $setupUpdates = [
+                'minecraft_version' => (string) ($candidate['minecraft_version'] ?? $setup->minecraft_version),
+                'last_error' => null,
+            ];
+            if ((bool) ($candidate['installer'] ?? false)) {
+                $setupUpdates['server_jar_path'] = null;
+                $setupUpdates['server_binary_path'] = (string) ($candidate['runtime_path'] ?? '/run.sh');
+            } elseif ($package->package_type === 'server_jar') {
+                $setupUpdates['server_jar_path'] = $newPath;
+                $setupUpdates['server_binary_path'] = null;
+            } else {
+                $setupUpdates['server_jar_path'] = null;
+                $setupUpdates['server_binary_path'] = (string) ($candidate['runtime_path'] ?? $newPath);
+            }
+            if (is_string($candidate['startup'] ?? null) && $candidate['startup'] !== '') {
+                $server->forceFill(['startup' => $candidate['startup']])->saveOrFail();
+            }
+            $setup->forceFill($setupUpdates)->save();
+
+            MinecraftToolkitUpdateCheck::query()->create([
+                'server_uuid' => $package->server_uuid,
+                'package_id' => $package->id,
+                'old_version_id' => $oldVersionId,
+                'new_version_id' => (string) $candidate['version_id'],
+                'old_version_number' => $oldVersionNumber,
+                'new_version_number' => (string) $candidate['version_number'],
+                'status' => 'up_to_date',
+                'message' => 'Die Server-Datei wurde erfolgreich aktualisiert.',
+                'candidate_json' => Schema::hasColumn('minecraft_toolkit_update_checks', 'candidate_json') ? $candidate : null,
+                'checked_at' => now(),
+            ]);
+            $this->log($server, 'server_artifact_updated', 'success', "{$package->project_name} wurde auf {$candidate['version_number']} aktualisiert.", [
+                'package_id' => $package->id,
+                'backup' => $backup,
+            ]);
+
+            return $package->refresh();
+        } catch (MinecraftToolkitException $exception) {
+            if ($candidate !== null) {
+                $this->storeCheck($package, 'error', $exception->getMessage());
+            }
+            $this->log($server, 'server_artifact_update_failed', 'error', $exception->getMessage(), [
+                'package_id' => $package->id,
+            ]);
+            throw $exception;
+        } catch (\Throwable $exception) {
+            report($exception);
+            $message = 'Das Server-Update ist fehlgeschlagen. Die alte Datei wurde soweit möglich wiederhergestellt.';
+            if ($candidate !== null) {
+                $this->storeCheck($package, 'error', $message);
+            }
+            $this->log($server, 'server_artifact_update_failed', 'error', $message, ['package_id' => $package->id]);
+            throw new MinecraftToolkitException($message, previous: $exception);
+        } finally {
+            $lock->release();
+        }
+    }
+
+    /** @return array<string, mixed> */
+    private function serverCandidate(MinecraftToolkitPackage $package, MinecraftToolkitSetup $setup): array
+    {
+        $software = (string) ($package->source_project_id ?: $setup->software);
+        $targetVersion = $software === 'bedrock' ? 'latest' : (string) $setup->minecraft_version;
+        $installation = $this->software->resolveInstallation(
+            $software,
+            $targetVersion,
+            $setup->loader
+        );
+
+        $fileName = $this->installer->safeFileName((string) ($installation['file_name'] ?? $package->file_name));
+        $versionId = (string) ($installation['version_id'] ?? $targetVersion);
+        $displayVersion = $software === 'bedrock'
+            ? $versionId
+            : trim($targetVersion . (($versionId !== '' && $versionId !== $targetVersion) ? ' / ' . $versionId : ''));
+        $hashes = [];
+        if (is_string($installation['sha256'] ?? null) && $installation['sha256'] !== '') {
+            $hashes['sha256'] = $installation['sha256'];
+        }
+
+        return [
+            'version_id' => $versionId,
+            'version_number' => $displayVersion,
+            'file_name' => $fileName,
+            'url' => (string) ($installation['url'] ?? ''),
+            'hashes' => $hashes,
+            'dependencies' => [],
+            'source' => (string) ($installation['source'] ?? $package->source),
+            'project_id' => $software,
+            'minecraft_version' => $software === 'bedrock' ? $versionId : $targetVersion,
+            'loader' => (string) ($setup->loader ?? $software),
+            'startup' => is_string($installation['startup'] ?? null) ? $installation['startup'] : null,
+            'installer' => (bool) ($installation['installer'] ?? false),
+            'runtime_path' => $package->package_type === 'server_binary'
+                || (bool) ($installation['installer'] ?? false)
+                ? ($software === 'bedrock' ? '/bedrock_server' : '/run.sh')
+                : null,
+        ];
     }
 
     /** @param array<string, mixed> $candidate
@@ -867,6 +1074,43 @@ class MinecraftUpdateService
         return $this->versionBase($a) === $this->versionBase($b);
     }
 
+    /** @param array<string, mixed> $candidate */
+    private function sameCandidateVersion(MinecraftToolkitPackage $package, array $candidate): bool
+    {
+        if ($this->isServerArtifact($package)) {
+            return (string) $candidate['version_id'] === (string) $package->source_version_id;
+        }
+
+        return (string) $candidate['version_id'] === (string) $package->source_version_id
+            && $this->versionsEquivalent((string) $candidate['version_number'], (string) $package->version_number);
+    }
+
+    /** @param array<string, mixed> $candidate */
+    private function serverTargetPath(MinecraftToolkitPackage $package, array $candidate): string
+    {
+        if ($package->package_type === 'server_binary') {
+            return '/' . ltrim((string) $candidate['file_name'], '/');
+        }
+
+        $directory = dirname((string) ($package->file_path ?: '/server.jar'));
+        if ($directory === '.' || $directory === DIRECTORY_SEPARATOR) {
+            $directory = '';
+        }
+
+        return rtrim($directory, '/') . '/' . (string) $candidate['file_name'];
+    }
+
+    private function isServerArtifact(MinecraftToolkitPackage $package): bool
+    {
+        return in_array($package->package_type, ['server_jar', 'server_binary'], true);
+    }
+
+    private function isJarPackage(MinecraftToolkitPackage $package): bool
+    {
+        return strtolower(pathinfo((string) $package->file_name, PATHINFO_EXTENSION)) === 'jar'
+            || strtolower(pathinfo((string) $package->file_path, PATHINFO_EXTENSION)) === 'jar';
+    }
+
     private function versionBase(string $version): string
     {
         $version = trim($version);
@@ -979,7 +1223,7 @@ class MinecraftUpdateService
         if ($storedSha512 !== ''
             && !hash_equals(strtolower($storedSha512), strtolower((string) ($metadata['sha512'] ?? '')))) {
             throw new MinecraftToolkitException(
-                'Die installierte Datei stimmt nicht mit der gespeicherten SHA-512-Pruefsumme ueberein.'
+                'Die installierte Datei stimmt nicht mit der gespeicherten SHA-512-Prüfsumme überein.'
             );
         }
 
@@ -987,7 +1231,7 @@ class MinecraftUpdateService
         if ($storedSha1 !== ''
             && !hash_equals(strtolower($storedSha1), strtolower((string) ($metadata['sha1'] ?? '')))) {
             throw new MinecraftToolkitException(
-                'Die installierte Datei stimmt nicht mit der gespeicherten SHA-1-Pruefsumme ueberein.'
+                'Die installierte Datei stimmt nicht mit der gespeicherten SHA-1-Prüfsumme überein.'
             );
         }
     }
@@ -999,7 +1243,7 @@ class MinecraftUpdateService
             ->where('server_uuid', $server->uuid)
             ->where('managed', true)
             ->where('enabled', true)
-            ->whereIn('package_type', ['plugin', 'mod', 'crossplay', 'dependency'])
+            ->whereIn('package_type', ['server_jar', 'server_binary', 'plugin', 'mod', 'crossplay', 'dependency'])
             ->orderBy('project_name')
             ->get();
     }
