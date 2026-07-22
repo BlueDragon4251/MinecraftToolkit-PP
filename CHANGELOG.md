@@ -10,11 +10,6 @@ This project is source-available, not open source. See [`LICENSE`](./LICENSE) fo
 
 ### Added
 
-- Added BlueIT CurseForge proxy support using signed Toolkit requests with client id, timestamp, nonce, Toolkit marker header, user-agent binding, and HMAC signatures.
-- Added CurseForge proxy secret rotation support and clearer 401 troubleshooting documentation for the BlueIT backend flow.
-- Added hidden/default CurseForge configuration behavior so proxy URL, shared secret, and direct API key fields stay empty in the panel unless an administrator intentionally overrides them.
-- Added broader Forge Minecraft version discovery by merging Maven metadata with Forge promotion metadata, so older Forge Minecraft versions are available in the setup wizard.
-- Added optional Vanilla Bedrock download override configuration for cases where the official Minecraft download page cannot be parsed.
 - Added configurable security gates for startup edits, risky version changes, package removal, CurseForge usage, Crossplay setup, and raw `server.properties` editing.
 - Added security audit log entries for denied or explicitly gated risky Toolkit actions.
 - Added an admin checklist on Minecraft Overview for backups, audit logging, CurseForge proxy trust, strict hashes, and risk gates.
@@ -25,6 +20,37 @@ This project is source-available, not open source. See [`LICENSE`](./LICENSE) fo
 - Added setup package profiles for curated starter sets such as Paper Basics, Paper Voice Chat, Fabric Performance, and Modded Voice Chat.
 - Added Minecraft Modpacks page with public Modrinth/CurseForge modpack search, custom `.mrpack`/`.zip` uploads, combine/replace installation modes, and switching between installed modpacks with archived files.
 - Added setup-time custom modpack uploads so `.mrpack`/`.zip` packs can be installed immediately after the server setup finishes.
+- Added signed and localized BlueIT announcements with Pelican inbox delivery, centered image popups, CTA buttons, permissions, and plugin-version targeting.
+
+### Changed
+
+- Changed updater bulk actions and verification labels to cover managed server files as well as plugins and mods.
+- Changed updater and installer package cards to show more operational details, including target file paths, version IDs, hashes, Minecraft/loader targets, dependency counts, and install age where available.
+- Changed version-change reports to show when compatibility results came from cache.
+- Changed German UI strings to use normal umlauts instead of ASCII replacements such as `ue`, `ae`, or `oe`.
+- Changed user-facing notifications to prefer the active user locale, with localized generic error bodies for non-German users when low-level service details are not translated yet.
+- Changed the plugin version to `1.3.5`.
+
+### Fixed
+
+- Fixed BlueIT announcements using Pelican's top-right toast instead of the centered image popup, and suppressed legacy duplicate toasts.
+- Fixed BlueIT announcement popups being hidden behind the server console or missing from the general server overview.
+- Fixed BlueIT announcement close buttons not immediately hiding and persisting dismissal of the popup.
+- Fixed BlueIT announcement rendering breaking Alpine and Livewire navigation with `_x_teleportBack` errors by mounting the listener directly at Filament's body hook.
+- Fixed deleted or no-longer-applicable BlueIT announcements remaining visible after the remote announcement was removed.
+- Fixed CurseForge settings saving so the enable toggle no longer stores inverted boolean values and defaults to the signed BlueIT proxy flow.
+- Fixed NeoForge version discovery for modern version lines such as `26.2.x` while preserving legacy `1.20.1` NeoForge/Forge compatibility.
+- Fixed mixed German/English setup, updater, version-change, settings, and modpack notifications by moving hardcoded page text into language files.
+
+## [1.2.1] - Previous release
+
+### Added
+
+- Added BlueIT CurseForge proxy support using signed Toolkit requests with client id, timestamp, nonce, Toolkit marker header, user-agent binding, and HMAC signatures.
+- Added CurseForge proxy secret rotation support and clearer 401 troubleshooting documentation for the BlueIT backend flow.
+- Added hidden/default CurseForge configuration behavior so proxy URL, shared secret, and direct API key fields stay empty in the panel unless an administrator intentionally overrides them.
+- Added broader Forge Minecraft version discovery by merging Maven metadata with Forge promotion metadata, so older Forge Minecraft versions are available in the setup wizard.
+- Added optional Vanilla Bedrock download override configuration for cases where the official Minecraft download page cannot be parsed.
 
 ### Changed
 
@@ -34,29 +60,16 @@ This project is source-available, not open source. See [`LICENSE`](./LICENSE) fo
 - Changed setup package selection to support mixed providers: Modrinth and CurseForge selections now remain selected when switching sources or changing search text, and setup installs the combined selection.
 - Changed Vanilla Bedrock version loading so the setup wizard always offers a `Latest official Bedrock server` option when the Minecraft download page cannot be parsed.
 - Changed Vanilla Bedrock setup downloads to download the official Bedrock ZIP through the panel first instead of using the Wings pull endpoint directly.
-- Changed updater bulk actions and verification labels to cover managed server files as well as plugins and mods.
-- Changed updater and installer package cards to show more operational details, including target file paths, version IDs, hashes, Minecraft/loader targets, dependency counts, and install age where available.
-- Changed version-change reports to show when compatibility results came from cache.
-- Changed German UI strings to use normal umlauts instead of ASCII replacements such as `ue`, `ae`, or `oe`.
-- Changed user-facing notifications to prefer the active user locale, with localized generic error bodies for non-German users when low-level service details are not translated yet.
 - Updated CurseForge proxy documentation for the official REST API flow, allowlisted endpoints, and server-side `x-api-key` handling.
 
 ### Fixed
 
-- Fixed BlueIT announcements using Pelican's top-right toast instead of the centered image popup, and suppressed legacy duplicate toasts.
-- Fixed BlueIT announcement popups being hidden behind the server console or missing from the general server overview.
-- Fixed BlueIT announcement close buttons not immediately hiding and persisting dismissal of the popup.
-- Fixed BlueIT announcement rendering breaking Alpine and Livewire navigation with `_x_teleportBack` errors by mounting the listener directly at Filament's body hook.
-- Fixed deleted or no-longer-applicable BlueIT announcements remaining visible after the remote announcement was removed.
 - Fixed Minecraft setup failing with `Call to undefined method MinecraftServerFileService::extractMaxClassMajorVersionFromJar()` by restoring the JAR class-version scanner and Java compatibility guard.
 - Fixed Forge loader version discovery for older Minecraft versions by merging Maven loader builds with Forge promotion metadata and refreshing the loader-version cache key.
 - Fixed CurseForge setup browsing showing a generic empty result when the proxy request fails; backend failures are now logged and surfaced more clearly during setup package loading.
 - Fixed Vanilla Bedrock setup showing `No options available` when the official Minecraft download page cannot be parsed.
 - Fixed Vanilla Bedrock `latest` setup by using the configured official Bedrock Linux ZIP fallback when the Minecraft download page cannot be parsed.
 - Fixed Vanilla Bedrock setup failing when Wings returns HTTP 500 for `minecraft.net` pull requests by downloading the ZIP through the panel and writing it to the server files afterward.
-- Fixed CurseForge settings saving so the enable toggle no longer stores inverted boolean values and defaults to the signed BlueIT proxy flow.
-- Fixed NeoForge version discovery for modern version lines such as `26.2.x` while preserving legacy `1.20.1` NeoForge/Forge compatibility.
-- Fixed mixed German/English setup, updater, version-change, settings, and modpack notifications by moving hardcoded page text into language files.
 
 ## [1.2.0] - Previous release
 
@@ -135,8 +148,6 @@ This project is source-available, not open source. See [`LICENSE`](./LICENSE) fo
 
 - Changed the setup Mods/Plugins step back to the same card-style package browser used by the installer, without rendering it outside the Mods/Plugins wizard step.
 - Changed Geyser configuration patching to update the modern `java.auth-type` and `motd` sections instead of only adding legacy/unused keys.
-- Changed the plugin version to `1.3.5`.
-
 - Changed the setup wizard defaults so no server software is preselected before the user chooses one.
 - Marked the plugin as source-available, not open source.
 - Clarified that redistribution, rebranding, public forks, modified public releases, and resale are not allowed without permission.
