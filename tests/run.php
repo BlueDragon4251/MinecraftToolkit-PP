@@ -22,6 +22,7 @@ use BlueWolf\MinecraftToolkit\Services\CurseForgeService;
 use BlueWolf\MinecraftToolkit\Services\GeyserDownloadService;
 use BlueWolf\MinecraftToolkit\Services\MinecraftCompatibilityService;
 use BlueWolf\MinecraftToolkit\Services\MinecraftCrossplayService;
+use BlueWolf\MinecraftToolkit\Services\MinecraftModpackService;
 use BlueWolf\MinecraftToolkit\Services\MinecraftPackageInstaller;
 use BlueWolf\MinecraftToolkit\Services\MinecraftPropertiesService;
 use BlueWolf\MinecraftToolkit\Services\MinecraftServerFileService;
@@ -328,7 +329,7 @@ $tests['JAR inspection metadata'] = function (): void {
 };
 
 $tests['modpack server archive paths'] = function (): void {
-    $reflection = new ReflectionClass(BlueWolf\MinecraftToolkit\Services\MinecraftModpackService::class);
+    $reflection = new ReflectionClass(MinecraftModpackService::class);
     $service = $reflection->newInstanceWithoutConstructor();
 
     assertSame('/mods/example.jar', invokePrivate($service, 'archiveTargetPath', ['mods/example.jar']));

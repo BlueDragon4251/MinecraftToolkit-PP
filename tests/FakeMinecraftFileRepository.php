@@ -48,6 +48,6 @@ final class FakeMinecraftFileRepository
             throw new \InvalidArgumentException('Unsafe path.');
         }
 
-return $path;
+        return $path;
     }
 }
