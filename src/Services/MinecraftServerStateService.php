@@ -16,7 +16,7 @@ class MinecraftServerStateService
             ->setServer($server)
             ->getDetails()['state'] ?? 'missing';
 
-        if (!in_array($state, ['offline', 'exited', 'dead', 'created'], true)) {
+        if (! in_array($state, ['offline', 'exited', 'dead', 'created'], true)) {
             throw new MinecraftToolkitException(
                 $state === 'missing'
                     ? 'Wings ist nicht erreichbar oder der Server fehlt auf dem Node.'

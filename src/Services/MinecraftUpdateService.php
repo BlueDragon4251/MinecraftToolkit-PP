@@ -11,6 +11,7 @@ use BlueWolf\MinecraftToolkit\Models\MinecraftToolkitPackage;
 use BlueWolf\MinecraftToolkit\Models\MinecraftToolkitSetup;
 use BlueWolf\MinecraftToolkit\Models\MinecraftToolkitUpdateCheck;
 use Illuminate\Contracts\Cache\Lock;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
@@ -39,16 +40,19 @@ class MinecraftUpdateService
                         'pinned',
                         'Das Paket ist gepinnt und wird nicht automatisch aktualisiert.'
                     );
+
                     continue;
                 }
 
                 $package = $this->syncPackageWithInstalledState($server, $package);
                 if (($runtimeIssue = $this->runtimeIssue($server, $package)) !== null) {
                     $checks[] = $this->storeCheck($package, 'error', $runtimeIssue);
+
                     continue;
                 }
                 if (($dependencyIssue = $this->missingRequiredDependencyIssue($server, $package)) !== null) {
                     $checks[] = $this->storeCheck($package, 'error', $dependencyIssue);
+
                     continue;
                 }
 
@@ -79,7 +83,7 @@ class MinecraftUpdateService
         return $checks;
     }
 
-    public function updatePackage(Server $server, MinecraftToolkitSetup $setup, int $packageId): MinecraftToolkitPackage
+    public function updatePackage(Server $server, MinecraftToolkitSetup $setup, int $packageId, bool $forceReinstall = false): MinecraftToolkitPackage
     {
         $package = MinecraftToolkitPackage::query()
             ->whereKey($packageId)
@@ -87,19 +91,19 @@ class MinecraftUpdateService
             ->where('managed', true)
             ->where('enabled', true)
             ->first();
-        if (!$package instanceof MinecraftToolkitPackage) {
+        if (! $package instanceof MinecraftToolkitPackage) {
             throw new MinecraftToolkitException('Das verwaltete Paket wurde nicht gefunden.');
         }
         if ($package->update_pinned) {
             throw new MinecraftToolkitException('Dieses Paket ist gepinnt. Hebe den Pin auf, bevor du es aktualisierst.');
         }
         if ($this->isServerArtifact($package)) {
-            return $this->updateServerPackage($server, $setup, $package);
+            return $this->updateServerPackage($server, $setup, $package, $forceReinstall);
         }
 
         /** @var Lock $lock */
         $lock = Cache::lock("minecrafttoolkit.update.{$server->uuid}", 600);
-        if (!$lock->get()) {
+        if (! $lock->get()) {
             throw new MinecraftToolkitException('Für diesen Server läuft bereits ein Paketupdate.');
         }
 
@@ -108,14 +112,14 @@ class MinecraftUpdateService
             $this->state->assertOffline($server);
             $package = $this->syncPackageWithInstalledState($server, $package);
             $candidate = $this->candidateFromLatestUpdateCheck($package) ?? $this->candidate($package, $setup);
-            if ($this->sameCandidateVersion($package, $candidate)) {
+            if (! $forceReinstall && $this->sameCandidateVersion($package, $candidate)) {
                 $this->storeCheck($package, 'up_to_date', 'Das Paket ist bereits aktuell.', $candidate);
 
                 return $package;
             }
 
             $oldPath = $package->file_path;
-            $newPath = dirname($oldPath) . '/' . $candidate['file_name'];
+            $newPath = dirname($oldPath).'/'.$candidate['file_name'];
             if ($newPath !== $oldPath && $this->files->exists($server, $newPath)) {
                 throw new MinecraftToolkitException(
                     "Die neue Paketdatei {$candidate['file_name']} existiert bereits."
@@ -130,7 +134,7 @@ class MinecraftUpdateService
                     $newPath,
                     $candidate['hashes']
                 );
-                if (!$this->files->exists($server, $newPath)) {
+                if (! $this->files->exists($server, $newPath)) {
                     throw new MinecraftToolkitException('Das Update wurde vom Dateisystem nicht bestätigt. Die neue Datei wurde nicht gefunden.');
                 }
                 if ($newPath !== $oldPath && $this->files->exists($server, $oldPath)) {
@@ -228,6 +232,7 @@ class MinecraftUpdateService
         foreach ($this->managedPackages($server) as $packageRecord) {
             if ($packageRecord->update_pinned) {
                 $skippedPinned++;
+
                 continue;
             }
 
@@ -236,7 +241,7 @@ class MinecraftUpdateService
                 ->where('package_id', $packageRecord->id)
                 ->latest('id')
                 ->first();
-            if (!$check instanceof MinecraftToolkitUpdateCheck || $check->status !== 'update_available') {
+            if (! $check instanceof MinecraftToolkitUpdateCheck || $check->status !== 'update_available') {
                 continue;
             }
 
@@ -268,7 +273,7 @@ class MinecraftUpdateService
             ->where('managed', true)
             ->where('enabled', true)
             ->first();
-        if (!$package instanceof MinecraftToolkitPackage) {
+        if (! $package instanceof MinecraftToolkitPackage) {
             throw new MinecraftToolkitException('Das verwaltete Paket wurde nicht gefunden.');
         }
 
@@ -302,11 +307,11 @@ class MinecraftUpdateService
             ->where('managed', true)
             ->where('enabled', true)
             ->first();
-        if (!$package instanceof MinecraftToolkitPackage) {
+        if (! $package instanceof MinecraftToolkitPackage) {
             throw new MinecraftToolkitException('Das verwaltete Paket wurde nicht gefunden.');
         }
 
-        if ($package->file_path === '' || !$this->files->exists($server, $package->file_path)) {
+        if ($package->file_path === '' || ! $this->files->exists($server, $package->file_path)) {
             $message = 'Die verwaltete Datei wurde nicht gefunden.';
             $this->storeCheck($package, 'error', $message);
             $this->log($server, 'package_verify_failed', 'error', $message, ['package_id' => $package->id]);
@@ -314,7 +319,7 @@ class MinecraftUpdateService
             return ['status' => 'error', 'message' => $message, 'metadata' => []];
         }
 
-        if (!$this->isJarPackage($package)) {
+        if (! $this->isJarPackage($package)) {
             $metadata = [
                 'file_path' => $package->file_path,
                 'file_name' => $package->file_name,
@@ -348,7 +353,7 @@ class MinecraftUpdateService
 
             $message = sprintf(
                 'Datei verifiziert. SHA-512: %s, Größe: %d Bytes.',
-                substr((string) $metadata['sha512'], 0, 16) . '...',
+                substr((string) $metadata['sha512'], 0, 16).'...',
                 (int) $metadata['size']
             );
             $this->storeCheck($package, 'verified', $message);
@@ -379,7 +384,6 @@ class MinecraftUpdateService
         }
     }
 
-
     /** @return array{installed: int, skipped: int, errors: string[]} */
     public function installMissingDependencies(Server $server, MinecraftToolkitSetup $setup, int $packageId): array
     {
@@ -389,7 +393,7 @@ class MinecraftUpdateService
             ->where('managed', true)
             ->where('enabled', true)
             ->first();
-        if (!$package instanceof MinecraftToolkitPackage) {
+        if (! $package instanceof MinecraftToolkitPackage) {
             throw new MinecraftToolkitException('Das verwaltete Paket wurde nicht gefunden.');
         }
 
@@ -414,6 +418,7 @@ class MinecraftUpdateService
             if ($dependencyProjectId === '') {
                 $skipped++;
                 $errors[] = 'Eine Pflicht-Abhängigkeit konnte nicht eindeutig aufgelöst werden.';
+
                 continue;
             }
 
@@ -425,12 +430,14 @@ class MinecraftUpdateService
                 } else {
                     $skipped++;
                     $errors[] = "Für die Quelle {$package->source} können Dependencies nicht automatisch installiert werden.";
+
                     continue;
                 }
                 $installed++;
             } catch (MinecraftToolkitException $exception) {
                 if (str_contains($exception->getMessage(), 'bereits von Minecraft Toolkit verwaltet')) {
                     $skipped++;
+
                     continue;
                 }
                 $errors[] = $exception->getMessage();
@@ -440,7 +447,7 @@ class MinecraftUpdateService
         $status = $errors === [] ? 'up_to_date' : 'error';
         $message = $errors === []
             ? "$installed Pflicht-Abhängigkeit(en) wurden installiert."
-            : "$installed Pflicht-Abhängigkeit(en) installiert, " . count($errors) . ' Fehler.';
+            : "$installed Pflicht-Abhängigkeit(en) installiert, ".count($errors).' Fehler.';
         $this->storeCheck($package, $status, $message);
         $this->log($server, 'dependencies_installed', $errors === [] ? 'success' : 'warning', $message, [
             'package_id' => $package->id,
@@ -460,7 +467,7 @@ class MinecraftUpdateService
             ->where('managed', true)
             ->where('enabled', true)
             ->first();
-        if (!$package instanceof MinecraftToolkitPackage) {
+        if (! $package instanceof MinecraftToolkitPackage) {
             throw new MinecraftToolkitException('Das verwaltete Paket wurde nicht gefunden.');
         }
 
@@ -512,14 +519,62 @@ class MinecraftUpdateService
         throw new MinecraftToolkitException('Für diese Paketquelle ist keine automatische Updateprüfung verfügbar.');
     }
 
+    public function reinstallPackage(Server $server, MinecraftToolkitSetup $setup, int $packageId): MinecraftToolkitPackage
+    {
+        $package = $this->updatePackage($server, $setup, $packageId, true);
+        $this->log($server, 'package_reinstalled', 'success', "{$package->project_name} wurde neu installiert.", [
+            'package_id' => $package->id,
+        ]);
+
+        return $package;
+    }
+
+    public function setPackageEnabled(Server $server, int $packageId, bool $enabled): MinecraftToolkitPackage
+    {
+        $package = MinecraftToolkitPackage::query()
+            ->whereKey($packageId)->where('server_uuid', $server->uuid)->where('managed', true)->first();
+        if (! $package instanceof MinecraftToolkitPackage || $this->isServerArtifact($package)) {
+            throw new MinecraftToolkitException('Dieses verwaltete Paket kann nicht deaktiviert werden.');
+        }
+
+        $this->state->assertOffline($server);
+        $path = (string) $package->file_path;
+        if ($enabled) {
+            $target = preg_replace('/\.disabled$/', '', $path) ?? $path;
+            if ($path !== $target && $this->files->exists($server, $path)) {
+                if ($this->files->exists($server, $target)) {
+                    throw new MinecraftToolkitException('Die aktive Zieldatei existiert bereits.');
+                }
+                $this->files->move($server, $path, $target);
+            }
+            $path = $target;
+        } elseif (! str_ends_with($path, '.disabled')) {
+            $target = $path.'.disabled';
+            if ($this->files->exists($server, $target)) {
+                throw new MinecraftToolkitException('Die deaktivierte Zieldatei existiert bereits.');
+            }
+            if ($this->files->exists($server, $path)) {
+                $this->files->move($server, $path, $target);
+            }
+            $path = $target;
+        }
+
+        $package->forceFill(['enabled' => $enabled, 'file_path' => $path, 'file_name' => basename($path)])->save();
+        $this->log($server, $enabled ? 'package_enabled' : 'package_disabled', 'info',
+            "{$package->project_name} wurde ".($enabled ? 'aktiviert.' : 'deaktiviert.'), ['package_id' => $package->id]);
+
+        return $package->refresh();
+    }
+
     private function updateServerPackage(
         Server $server,
         MinecraftToolkitSetup $setup,
-        MinecraftToolkitPackage $package
+        MinecraftToolkitPackage $package,
+        bool $forceReinstall = false
     ): MinecraftToolkitPackage {
         /** @var Lock $lock */
         $lock = Cache::lock("minecrafttoolkit.server-update.{$server->uuid}", 600);
-        if (!$lock->get()) {
+        if (! $lock->get()) {
             throw new MinecraftToolkitException('Für diesen Server läuft bereits ein Server-Update.');
         }
 
@@ -527,7 +582,7 @@ class MinecraftUpdateService
         try {
             $this->state->assertOffline($server);
             $candidate = $this->candidateFromLatestUpdateCheck($package) ?? $this->serverCandidate($package, $setup);
-            if ($this->sameCandidateVersion($package, $candidate)) {
+            if (! $forceReinstall && $this->sameCandidateVersion($package, $candidate)) {
                 $this->storeCheck($package, 'up_to_date', 'Die Server-Datei ist bereits aktuell.', $candidate);
 
                 return $package;
@@ -553,7 +608,7 @@ class MinecraftUpdateService
                     );
                 }
 
-                if (!$this->files->exists($server, $newPath)) {
+                if (! $this->files->exists($server, $newPath)) {
                     throw new MinecraftToolkitException('Das Server-Update wurde vom Dateisystem nicht bestätigt.');
                 }
                 if ($newPath !== $oldPath && $this->files->exists($server, $oldPath)) {
@@ -670,7 +725,7 @@ class MinecraftUpdateService
         $versionId = (string) ($installation['version_id'] ?? $targetVersion);
         $displayVersion = $software === 'bedrock'
             ? $versionId
-            : trim($targetVersion . (($versionId !== '' && $versionId !== $targetVersion) ? ' / ' . $versionId : ''));
+            : trim($targetVersion.(($versionId !== '' && $versionId !== $targetVersion) ? ' / '.$versionId : ''));
         $hashes = [];
         if (is_string($installation['sha256'] ?? null) && $installation['sha256'] !== '') {
             $hashes['sha256'] = $installation['sha256'];
@@ -697,13 +752,13 @@ class MinecraftUpdateService
     }
 
     /** @param array<string, mixed> $candidate
-     *  @return array<string, mixed>
+     * @return array<string, mixed>
      */
     public function normalizeModrinthCandidate(array $candidate): array
     {
         $version = $candidate['version'] ?? null;
         $file = is_array($version) ? ($version['selected_file'] ?? null) : null;
-        if (!is_array($version) || !is_array($file)) {
+        if (! is_array($version) || ! is_array($file)) {
             throw new MinecraftToolkitException('Die Modrinth-Updateinformationen sind unvollständig.');
         }
 
@@ -718,13 +773,13 @@ class MinecraftUpdateService
     }
 
     /** @param array<string, mixed> $download
-     *  @return array<string, mixed>
+     * @return array<string, mixed>
      */
     public function normalizeGeyserCandidate(array $download): array
     {
         return [
             'version_id' => (string) $download['build'],
-            'version_number' => $download['version'] . '+' . $download['build'],
+            'version_number' => $download['version'].'+'.$download['build'],
             'file_name' => $this->installer->safeFileName((string) $download['file_name']),
             'url' => (string) $download['url'],
             'hashes' => ['sha256' => (string) $download['sha256']],
@@ -732,12 +787,11 @@ class MinecraftUpdateService
         ];
     }
 
-
     private function syncPackageWithInstalledState(Server $server, MinecraftToolkitPackage $package): MinecraftToolkitPackage
     {
         try {
             $log = $this->readLatestLog($server);
-            $logIsFresh = !$this->latestLogIsOlderThanPackageInstall($log, $package);
+            $logIsFresh = ! $this->latestLogIsOlderThanPackageInstall($log, $package);
             $loaded = $logIsFresh ? $this->loadedPluginVersions($log) : [];
             $actualVersion = $this->matchLoadedVersion($package, $loaded);
             $actualFileName = $this->matchInstalledFileName($server, $package);
@@ -745,13 +799,13 @@ class MinecraftUpdateService
             $changes = [];
             if ($actualVersion !== null
                 && $package->source !== 'geysermc'
-                && !$this->versionsEquivalent($actualVersion, (string) $package->version_number)
+                && ! $this->versionsEquivalent($actualVersion, (string) $package->version_number)
             ) {
                 $changes['version_number'] = $actualVersion;
             }
             if ($actualFileName !== null && $actualFileName !== $package->file_name) {
                 $changes['file_name'] = $actualFileName;
-                $changes['file_path'] = dirname($package->file_path ?: '/plugins/x.jar') . '/' . $actualFileName;
+                $changes['file_path'] = dirname($package->file_path ?: '/plugins/x.jar').'/'.$actualFileName;
             }
             if ($changes !== []) {
                 $changes['last_checked_at'] = now();
@@ -785,18 +839,18 @@ class MinecraftUpdateService
         }
 
         $fileName = preg_quote($package->file_name, '/');
-        if ($fileName !== '' && preg_match('/Could not load.*' . $fileName . '.*?Unknown\/missing dependency plugins: \[([^\]]+)\]/s', $log, $matches)) {
+        if ($fileName !== '' && preg_match('/Could not load.*'.$fileName.'.*?Unknown\/missing dependency plugins: \[([^\]]+)\]/s', $log, $matches)) {
             return "Das Paket konnte zuletzt nicht laden. Fehlende Plugin-Abhängigkeit: {$matches[1]}.";
         }
-        if ($fileName !== '' && preg_match('/Could not load.*' . $fileName . '.*?compiled by a more recent version of the Java Runtime.*?class file version ([0-9.]+).*?recognizes class file versions up to ([0-9.]+)/s', $log, $matches)) {
+        if ($fileName !== '' && preg_match('/Could not load.*'.$fileName.'.*?compiled by a more recent version of the Java Runtime.*?class file version ([0-9.]+).*?recognizes class file versions up to ([0-9.]+)/s', $log, $matches)) {
             return "Das Paket benötigt eine neuere Java-Version. Class-Version {$matches[1]} ist installiert, Java auf dem Server unterstützt nur bis {$matches[2]}.";
         }
 
         $name = preg_quote($this->normalName($package->project_name), '/');
-        if ($name !== '' && preg_match('/Could not load[^\n]*(?:' . $name . ')[\s\S]{0,1200}?Unknown\/missing dependency plugins: \[([^\]]+)\]/i', $log, $matches)) {
+        if ($name !== '' && preg_match('/Could not load[^\n]*(?:'.$name.')[\s\S]{0,1200}?Unknown\/missing dependency plugins: \[([^\]]+)\]/i', $log, $matches)) {
             return "Das Paket konnte zuletzt nicht laden. Fehlende Plugin-Abhängigkeit: {$matches[1]}.";
         }
-        if ($name !== '' && preg_match('/Could not load[^\n]*(?:' . $name . ')[\s\S]{0,1600}?compiled by a more recent version of the Java Runtime[\s\S]{0,400}?class file version ([0-9.]+)[\s\S]{0,400}?recognizes class file versions up to ([0-9.]+)/i', $log, $matches)) {
+        if ($name !== '' && preg_match('/Could not load[^\n]*(?:'.$name.')[\s\S]{0,1600}?compiled by a more recent version of the Java Runtime[\s\S]{0,400}?class file version ([0-9.]+)[\s\S]{0,400}?recognizes class file versions up to ([0-9.]+)/i', $log, $matches)) {
             return "Das Paket benötigt eine neuere Java-Version. Class-Version {$matches[1]} ist installiert, Java auf dem Server unterstützt nur bis {$matches[2]}.";
         }
 
@@ -806,7 +860,7 @@ class MinecraftUpdateService
     private function missingRequiredDependencyIssue(Server $server, MinecraftToolkitPackage $package): ?string
     {
         $dependencies = $package->dependencies_json;
-        if (!is_array($dependencies)) {
+        if (! is_array($dependencies)) {
             $dependencies = [];
         }
         $dependencies = array_merge($dependencies, $this->knownRequiredDependenciesForPackage($package));
@@ -824,7 +878,7 @@ class MinecraftUpdateService
         $missing = collect($dependencies)
             ->filter(fn (mixed $dependency): bool => is_array($dependency)
                 && ($dependency['type'] ?? null) === 'required'
-                && !$this->dependencyIsInstalled($dependency, $installed))
+                && ! $this->dependencyIsInstalled($dependency, $installed))
             ->pluck('title')
             ->filter()
             ->values()
@@ -834,9 +888,8 @@ class MinecraftUpdateService
             return null;
         }
 
-        return 'Pflicht-Abhängigkeiten fehlen: ' . implode(', ', $missing) . '. Installiere sie über den Updater nach.';
+        return 'Pflicht-Abhängigkeiten fehlen: '.implode(', ', $missing).'. Installiere sie über den Updater nach.';
     }
-
 
     /** @return array<int, array<string, mixed>> */
     private function missingDependencies(Server $server, MinecraftToolkitSetup $setup, MinecraftToolkitPackage $package): array
@@ -866,7 +919,7 @@ class MinecraftUpdateService
         return collect($dependencies)
             ->filter(fn (mixed $dependency): bool => is_array($dependency)
                 && ($dependency['type'] ?? null) === 'required'
-                && !$this->dependencyIsInstalled($dependency, $installed))
+                && ! $this->dependencyIsInstalled($dependency, $installed))
             ->unique(fn (array $dependency): string => strtolower((string) ($dependency['project_id'] ?? $dependency['slug'] ?? $dependency['title'] ?? '')))
             ->values()
             ->all();
@@ -909,7 +962,7 @@ class MinecraftUpdateService
     }
 
     /** @param array<string, mixed> $dependency
-     *  @param array<int, string> $installed
+     * @param  array<int, string>  $installed
      */
     private function dependencyIsInstalled(array $dependency, array $installed): bool
     {
@@ -940,13 +993,13 @@ class MinecraftUpdateService
         }
 
         $fileName = preg_quote($package->file_name, '/');
-        if ($fileName !== '' && preg_match('/Could not load.*' . $fileName . '.*?Unknown\/missing dependency plugins: \[([^\]]+)\]/s', $log, $matches)) {
+        if ($fileName !== '' && preg_match('/Could not load.*'.$fileName.'.*?Unknown\/missing dependency plugins: \[([^\]]+)\]/s', $log, $matches)) {
             return trim(explode(',', $matches[1])[0]);
         }
 
         $name = preg_quote($this->normalName($package->project_name), '/');
         if ($name !== '' && preg_match('/Could not load[^
-]*(?:' . $name . ')[\s\S]{0,1200}?Unknown\/missing dependency plugins: \[([^\]]+)\]/i', $log, $matches)) {
+]*(?:'.$name.')[\s\S]{0,1200}?Unknown\/missing dependency plugins: \[([^\]]+)\]/i', $log, $matches)) {
             return trim(explode(',', $matches[1])[0]);
         }
 
@@ -956,12 +1009,12 @@ class MinecraftUpdateService
     private function dependencyProjectIdFromTitle(string $title): string
     {
         $normalized = $this->normalName($title);
+
         return match ($normalized) {
             'viabackwards' => 'viabackwards',
             default => $normalized,
         };
     }
-
 
     /** @return array<string, string> */
     private function loadedPluginVersions(string $log): array
@@ -1016,7 +1069,7 @@ class MinecraftUpdateService
     private function matchInstalledFileName(Server $server, MinecraftToolkitPackage $package): ?string
     {
         $directory = dirname($package->file_path ?: '');
-        if (!in_array($directory, ['/plugins', '/mods'], true)) {
+        if (! in_array($directory, ['/plugins', '/mods'], true)) {
             return null;
         }
 
@@ -1036,18 +1089,17 @@ class MinecraftUpdateService
         return null;
     }
 
-
     private function latestLogIsOlderThanPackageInstall(string $log, MinecraftToolkitPackage $package): bool
     {
         if ($package->installed_at === null || $log === '') {
             return false;
         }
-        if (!preg_match_all('/\[([0-2][0-9]:[0-5][0-9]:[0-5][0-9])\]/', $log, $matches) || $matches[1] === []) {
+        if (! preg_match_all('/\[([0-2][0-9]:[0-5][0-9]:[0-5][0-9])\]/', $log, $matches) || $matches[1] === []) {
             return false;
         }
 
         $last = end($matches[1]);
-        if (!is_string($last)) {
+        if (! is_string($last)) {
             return false;
         }
 
@@ -1089,7 +1141,7 @@ class MinecraftUpdateService
     private function serverTargetPath(MinecraftToolkitPackage $package, array $candidate): string
     {
         if ($package->package_type === 'server_binary') {
-            return '/' . ltrim((string) $candidate['file_name'], '/');
+            return '/'.ltrim((string) $candidate['file_name'], '/');
         }
 
         $directory = dirname((string) ($package->file_path ?: '/server.jar'));
@@ -1097,7 +1149,7 @@ class MinecraftUpdateService
             $directory = '';
         }
 
-        return rtrim($directory, '/') . '/' . (string) $candidate['file_name'];
+        return rtrim($directory, '/').'/'.(string) $candidate['file_name'];
     }
 
     private function isServerArtifact(MinecraftToolkitPackage $package): bool
@@ -1118,9 +1170,9 @@ class MinecraftUpdateService
         $version = preg_replace('/\+.*$/', '', $version) ?? $version;
         $version = preg_replace('/-SNAPSHOT.*$/', '', $version) ?? $version;
         $version = preg_replace('/^(?:bukkit|spigot|paper|fabric|forge|neoforge)-/i', '', $version) ?? $version;
+
         return trim($version);
     }
-
 
     private function readLatestLog(Server $server): string
     {
@@ -1138,7 +1190,17 @@ class MinecraftUpdateService
         $name = preg_replace('/\b(bukkit|spigot|paper|plugin|mod)\b/', '', $name) ?? $name;
         $name = preg_replace('/[^a-z0-9]+/', '', $name) ?? $name;
 
-        return trim($name);
+        $aliases = [
+            'essentialsx' => 'essentials', 'essentialsxcore' => 'essentials',
+            'geyserspigot' => 'geyser', 'geyserbukkit' => 'geyser',
+            'floodgatespigot' => 'floodgate', 'floodgatebukkit' => 'floodgate',
+            'luckpermsbukkit' => 'luckperms', 'luckpermspaper' => 'luckperms',
+            'viaversionbukkit' => 'viaversion', 'viabackwardsbukkit' => 'viabackwards',
+            'simplevoicechatbukkit' => 'voicechat', 'simplevoicechat' => 'voicechat',
+            'worldeditbukkit' => 'worldedit', 'worldguardbukkit' => 'worldguard',
+        ];
+
+        return $aliases[trim($name)] ?? trim($name);
     }
 
     private function cleanLoadedVersion(string $version): string
@@ -1150,11 +1212,10 @@ class MinecraftUpdateService
         return trim($version);
     }
 
-
     /** @return array<string, mixed>|null */
     private function candidateFromLatestUpdateCheck(MinecraftToolkitPackage $package): ?array
     {
-        if (!Schema::hasColumn('minecraft_toolkit_update_checks', 'candidate_json')) {
+        if (! Schema::hasColumn('minecraft_toolkit_update_checks', 'candidate_json')) {
             return null;
         }
 
@@ -1165,13 +1226,13 @@ class MinecraftUpdateService
             ->latest('id')
             ->first();
 
-        if (!$check instanceof MinecraftToolkitUpdateCheck || !is_array($check->candidate_json)) {
+        if (! $check instanceof MinecraftToolkitUpdateCheck || ! is_array($check->candidate_json)) {
             return null;
         }
 
         $candidate = $check->candidate_json;
         foreach (['version_id', 'version_number', 'file_name', 'url', 'hashes', 'dependencies'] as $key) {
-            if (!array_key_exists($key, $candidate)) {
+            if (! array_key_exists($key, $candidate)) {
                 return null;
             }
         }
@@ -1180,7 +1241,7 @@ class MinecraftUpdateService
         // currently installed package version. This avoids installing a stale candidate
         // after a manual file replacement.
         if ((string) ($check->old_version_id ?? '') !== (string) ($package->source_version_id ?? '')
-            && !$this->versionsEquivalent((string) ($check->old_version_number ?? ''), (string) ($package->version_number ?? ''))) {
+            && ! $this->versionsEquivalent((string) ($check->old_version_number ?? ''), (string) ($package->version_number ?? ''))) {
             return null;
         }
 
@@ -1188,7 +1249,7 @@ class MinecraftUpdateService
     }
 
     /** @param array<string, mixed> $candidate
-     *  @param array{sha1: string, sha256: string, sha512: string, size: int, plugin_version: ?string} $metadata
+     * @param  array{sha1: string, sha256: string, sha512: string, size: int, plugin_version: ?string}  $metadata
      */
     private function assertDownloadedPackageMatchesCandidate(
         MinecraftToolkitPackage $package,
@@ -1196,7 +1257,7 @@ class MinecraftUpdateService
         array $metadata
     ): void {
         $downloadedVersion = $metadata['plugin_version'] ?? null;
-        if (!is_string($downloadedVersion) || $downloadedVersion === '') {
+        if (! is_string($downloadedVersion) || $downloadedVersion === '') {
             return;
         }
 
@@ -1209,7 +1270,7 @@ class MinecraftUpdateService
             return;
         }
 
-        if (!$this->versionsEquivalent($downloadedVersion, $expected)) {
+        if (! $this->versionsEquivalent($downloadedVersion, $expected)) {
             throw new MinecraftToolkitException(
                 "Die heruntergeladene Datei enthält Version $downloadedVersion, erwartet wurde aber $expected. Das Update wurde abgebrochen, weil die Quelle eine falsche/alte Datei geliefert hat."
             );
@@ -1221,7 +1282,7 @@ class MinecraftUpdateService
     {
         $storedSha512 = trim((string) ($package->sha512 ?? ''));
         if ($storedSha512 !== ''
-            && !hash_equals(strtolower($storedSha512), strtolower((string) ($metadata['sha512'] ?? '')))) {
+            && ! hash_equals(strtolower($storedSha512), strtolower((string) ($metadata['sha512'] ?? '')))) {
             throw new MinecraftToolkitException(
                 'Die installierte Datei stimmt nicht mit der gespeicherten SHA-512-Prüfsumme überein.'
             );
@@ -1229,14 +1290,14 @@ class MinecraftUpdateService
 
         $storedSha1 = trim((string) ($package->sha1 ?? ''));
         if ($storedSha1 !== ''
-            && !hash_equals(strtolower($storedSha1), strtolower((string) ($metadata['sha1'] ?? '')))) {
+            && ! hash_equals(strtolower($storedSha1), strtolower((string) ($metadata['sha1'] ?? '')))) {
             throw new MinecraftToolkitException(
                 'Die installierte Datei stimmt nicht mit der gespeicherten SHA-1-Prüfsumme überein.'
             );
         }
     }
 
-    /** @return \Illuminate\Database\Eloquent\Collection<int, MinecraftToolkitPackage> */
+    /** @return Collection<int, MinecraftToolkitPackage> */
     private function managedPackages(Server $server)
     {
         return MinecraftToolkitPackage::query()

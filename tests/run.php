@@ -2,33 +2,61 @@
 
 declare(strict_types=1);
 
-if (!function_exists('mb_split')) {
+if (! function_exists('mb_split')) {
     function mb_split(string $pattern, string $string, int $limit = -1): array|false
     {
-        return preg_split('/' . str_replace('/', '\/', $pattern) . '/u', $string, $limit);
+        return preg_split('/'.str_replace('/', '\/', $pattern).'/u', $string, $limit);
     }
 }
 
 $root = dirname(__DIR__, 2);
-$loader = require $root . '/pelican/vendor/autoload.php';
-$loader->addPsr4('BlueWolf\\MinecraftToolkit\\', dirname(__DIR__) . '/src/');
+$loader = require $root.'/pelican/vendor/autoload.php';
+$loader->addPsr4('BlueWolf\\MinecraftToolkit\\', dirname(__DIR__).'/src/');
+require_once __DIR__.'/FakeMinecraftFileRepository.php';
 
-use BlueWolf\MinecraftToolkit\Services\MinecraftPropertiesService;
-use BlueWolf\MinecraftToolkit\Services\MinecraftCrossplayService;
-use BlueWolf\MinecraftToolkit\Services\MinecraftPackageInstaller;
-use BlueWolf\MinecraftToolkit\Services\MinecraftSoftwareService;
-use BlueWolf\MinecraftToolkit\Services\ModrinthService;
-use BlueWolf\MinecraftToolkit\Services\MinecraftUpdateService;
-use BlueWolf\MinecraftToolkit\Services\MinecraftCompatibilityService;
-use BlueWolf\MinecraftToolkit\Services\GeyserDownloadService;
-use BlueWolf\MinecraftToolkit\Services\CurseForgeService;
+use BlueWolf\MinecraftToolkit\Exceptions\MinecraftToolkitException;
 use BlueWolf\MinecraftToolkit\Models\MinecraftToolkitPackage;
 use BlueWolf\MinecraftToolkit\Models\MinecraftToolkitSetup;
+use BlueWolf\MinecraftToolkit\Services\CurseForgeApiKeyProvider;
+use BlueWolf\MinecraftToolkit\Services\CurseForgeService;
+use BlueWolf\MinecraftToolkit\Services\GeyserDownloadService;
+use BlueWolf\MinecraftToolkit\Services\MinecraftCompatibilityService;
+use BlueWolf\MinecraftToolkit\Services\MinecraftCrossplayService;
+use BlueWolf\MinecraftToolkit\Services\MinecraftPackageInstaller;
+use BlueWolf\MinecraftToolkit\Services\MinecraftPropertiesService;
+use BlueWolf\MinecraftToolkit\Services\MinecraftServerFileService;
+use BlueWolf\MinecraftToolkit\Services\MinecraftSoftwareService;
+use BlueWolf\MinecraftToolkit\Services\MinecraftUpdateService;
+use BlueWolf\MinecraftToolkit\Services\ModrinthService;
+use BlueWolf\MinecraftToolkit\Tests\FakeMinecraftFileRepository;
 
 $tests = [];
 
+$tests['fake Wings file repository'] = function (): void {
+    $repository = new FakeMinecraftFileRepository;
+    $repository->put('/plugins/test.jar.tmp', 'verified');
+    $repository->move('/plugins/test.jar.tmp', '/plugins/test.jar');
+    if ($repository->exists('/plugins/test.jar.tmp') || $repository->get('/plugins/test.jar') !== 'verified') {
+        throw new RuntimeException('Fake Wings atomic move failed.');
+    }
+};
+
+$tests['source response fixtures'] = function (): void {
+    $modrinth = json_decode((string) file_get_contents(__DIR__.'/fixtures/modrinth-search.json'), true, flags: JSON_THROW_ON_ERROR);
+    $normalized = (new ModrinthService)->normalizeSearchResults($modrinth['hits']);
+    assertSame('fixture-project', $normalized[0]['project_id']);
+
+    $provider = new class extends CurseForgeApiKeyProvider
+    {
+        public function __construct() {}
+    };
+    $curseForge = json_decode((string) file_get_contents(__DIR__.'/fixtures/curseforge-search.json'), true, flags: JSON_THROW_ON_ERROR);
+    $normalizedCurseForge = (new CurseForgeService($provider))->normalizeSearchResults($curseForge['data']);
+    assertSame('123', $normalizedCurseForge[0]['project_id']);
+};
+
 $tests['java properties'] = function (): void {
-    $service = new MinecraftPropertiesService();
+    $service = new MinecraftPropertiesService;
     $properties = $service->generateJava([
         'motd' => 'Grüße: Test=Ja',
         'level_name' => 'world',
@@ -43,7 +71,7 @@ $tests['java properties'] = function (): void {
 };
 
 $tests['targeted properties patch'] = function (): void {
-    $service = new MinecraftPropertiesService();
+    $service = new MinecraftPropertiesService;
     $original = "motd=Alt\nmax-players=20\ncustom-setting=keep\n";
     $patched = $service->patch($original, [
         'motd' => 'Neu: schön',
@@ -56,7 +84,7 @@ $tests['targeted properties patch'] = function (): void {
 };
 
 $tests['latest stable Paper build'] = function (): void {
-    $service = new MinecraftSoftwareService();
+    $service = new MinecraftSoftwareService;
     $build = $service->selectPaperBuild([
         ['id' => 132, 'channel' => 'STABLE'],
         ['id' => 131, 'channel' => 'STABLE'],
@@ -69,7 +97,7 @@ $tests['latest stable Paper build'] = function (): void {
 };
 
 $tests['Forge Minecraft version mapping'] = function (): void {
-    $service = new MinecraftSoftwareService();
+    $service = new MinecraftSoftwareService;
     $versions = $service->forgeMinecraftVersions([
         '1.21.11-61.1.8',
         '1.21.11-61.1.7',
@@ -81,22 +109,22 @@ $tests['Forge Minecraft version mapping'] = function (): void {
 };
 
 $tests['NeoForge Minecraft version mapping'] = function (): void {
-    $service = new MinecraftSoftwareService();
+    $service = new MinecraftSoftwareService;
     $versions = array_values(array_unique(array_merge(
         $service->forgeMinecraftVersions([
             '1.20.1-47.1.106',
             '1.20.1-47.1.105',
         ]),
         $service->neoForgeMinecraftVersions([
-        '21.0.167',
-        '21.1.219',
-        '20.4.251',
-        '26.1.2.75',
-        '26.2.0.7-beta',
+            '21.0.167',
+            '21.1.219',
+            '20.4.251',
+            '26.1.2.75',
+            '26.2.0.7-beta',
         ])
     )));
 
-    assertSame(['1.20.1', '1.21', '1.21.1', '1.20.4', '26.1', '26.2'], $versions);
+    assertSame(['1.20.1', '26.2', '26.1.2', '1.21.1', '1.21', '1.20.4'], $versions);
     assertSame('20.4.', $service->neoForgePrefix('1.20.4'));
     assertSame('21.1.', $service->neoForgePrefix('1.21.1'));
     assertSame('26.1.', $service->neoForgePrefix('26.1'));
@@ -104,12 +132,12 @@ $tests['NeoForge Minecraft version mapping'] = function (): void {
 };
 
 $tests['Modrinth plugin facets'] = function (): void {
-    $setup = new MinecraftToolkitSetup();
+    $setup = new MinecraftToolkitSetup;
     $setup->forceFill([
         'software' => 'paper',
         'minecraft_version' => '1.21.4',
     ]);
-    $facets = (new ModrinthService())->searchFacets($setup);
+    $facets = (new ModrinthService)->searchFacets($setup);
 
     assertSame(['categories:paper', 'categories:spigot', 'categories:bukkit'], $facets[0]);
     assertSame(['versions:1.21.4'], $facets[1]);
@@ -118,12 +146,12 @@ $tests['Modrinth plugin facets'] = function (): void {
 
 $tests['Modrinth mod facets'] = function (): void {
     foreach (['fabric', 'forge', 'neoforge'] as $loader) {
-        $setup = new MinecraftToolkitSetup();
+        $setup = new MinecraftToolkitSetup;
         $setup->forceFill([
             'software' => $loader,
             'minecraft_version' => '1.21.1',
         ]);
-        $facets = (new ModrinthService())->searchFacets($setup);
+        $facets = (new ModrinthService)->searchFacets($setup);
 
         assertSame(["categories:$loader"], $facets[0]);
         assertSame(['versions:1.21.1'], $facets[1]);
@@ -132,7 +160,7 @@ $tests['Modrinth mod facets'] = function (): void {
 };
 
 $tests['Modrinth search normalization'] = function (): void {
-    $results = (new ModrinthService())->normalizeSearchResults([[
+    $results = (new ModrinthService)->normalizeSearchResults([[
         'project_id' => 'Vebnzrzj',
         'slug' => 'luckperms',
         'title' => 'LuckPerms',
@@ -153,6 +181,16 @@ $tests['package filename validation'] = function (): void {
     $installer = $reflection->newInstanceWithoutConstructor();
 
     assertSame('LuckPerms-Bukkit-5.5.53.jar', $installer->safeFileName('LuckPerms-Bukkit-5.5.53.jar'));
+    assertSame(
+        'Better MC [FORGE] BMC4 v28.zip',
+        $installer->safeFileName('Better MC [FORGE] BMC4 v28.zip', ['zip', 'mrpack'])
+    );
+
+    try {
+        $installer->safeFileName('modpack.zip');
+        throw new RuntimeException('An archive was accepted as a JAR package.');
+    } catch (MinecraftToolkitException) {
+    }
 
     try {
         $installer->safeFileName('../malicious.jar');
@@ -164,7 +202,7 @@ $tests['package filename validation'] = function (): void {
 };
 
 $tests['download URL security validation'] = function (): void {
-    $reflection = new ReflectionClass(BlueWolf\MinecraftToolkit\Services\MinecraftServerFileService::class);
+    $reflection = new ReflectionClass(MinecraftServerFileService::class);
     $service = $reflection->newInstanceWithoutConstructor();
 
     foreach ([
@@ -184,7 +222,7 @@ $tests['download URL security validation'] = function (): void {
 };
 
 $tests['download redirect resolution'] = function (): void {
-    $reflection = new ReflectionClass(BlueWolf\MinecraftToolkit\Services\MinecraftServerFileService::class);
+    $reflection = new ReflectionClass(MinecraftServerFileService::class);
     $service = $reflection->newInstanceWithoutConstructor();
 
     assertSame(
@@ -204,7 +242,7 @@ $tests['download redirect resolution'] = function (): void {
 };
 
 $tests['JAR magic and structure validation'] = function (): void {
-    $reflection = new ReflectionClass(BlueWolf\MinecraftToolkit\Services\MinecraftServerFileService::class);
+    $reflection = new ReflectionClass(MinecraftServerFileService::class);
     $service = $reflection->newInstanceWithoutConstructor();
 
     try {
@@ -217,23 +255,23 @@ $tests['JAR magic and structure validation'] = function (): void {
 };
 
 $tests['JAR class version extraction'] = function (): void {
-    if (!class_exists(ZipArchive::class)) {
+    if (! class_exists(ZipArchive::class)) {
         return;
     }
 
     $tmp = tempnam(sys_get_temp_dir(), 'mtk-test-jar-');
-    $zip = new ZipArchive();
+    $zip = new ZipArchive;
     $zip->open($tmp, ZipArchive::OVERWRITE);
     $zip->addFromString('Example.class', pack('Nnn', 0xCAFEBABE, 0, 66));
     $zip->close();
 
     try {
         $contents = file_get_contents($tmp);
-        if (!is_string($contents)) {
+        if (! is_string($contents)) {
             throw new RuntimeException('Could not read test JAR.');
         }
 
-        $reflection = new ReflectionClass(BlueWolf\MinecraftToolkit\Services\MinecraftServerFileService::class);
+        $reflection = new ReflectionClass(MinecraftServerFileService::class);
         $service = $reflection->newInstanceWithoutConstructor();
 
         assertSame(66, invokePrivate($service, 'extractMaxClassMajorVersionFromJar', [$contents]));
@@ -242,13 +280,29 @@ $tests['JAR class version extraction'] = function (): void {
     }
 };
 
+$tests['JAR Java class version ceiling'] = function (): void {
+    $reflection = new ReflectionClass(MinecraftServerFileService::class);
+    $service = $reflection->newInstanceWithoutConstructor();
+
+    invokePrivate($service, 'assertJavaClassVersionAllowed', [66]);
+    invokePrivate($service, 'assertJavaClassVersionAllowed', [69]);
+
+    try {
+        invokePrivate($service, 'assertJavaClassVersionAllowed', [70]);
+    } catch (MinecraftToolkitException) {
+        return;
+    }
+
+    throw new RuntimeException('A JAR above the configured Java class ceiling was accepted.');
+};
+
 $tests['JAR inspection metadata'] = function (): void {
-    if (!class_exists(ZipArchive::class)) {
+    if (! class_exists(ZipArchive::class)) {
         return;
     }
 
     $tmp = tempnam(sys_get_temp_dir(), 'mtk-test-jar-');
-    $zip = new ZipArchive();
+    $zip = new ZipArchive;
     $zip->open($tmp, ZipArchive::OVERWRITE);
     $zip->addFromString('plugin.yml', "name: Example\nversion: 1.2.3\n");
     $zip->addFromString('Example.class', pack('Nnn', 0xCAFEBABE, 0, 65));
@@ -256,11 +310,11 @@ $tests['JAR inspection metadata'] = function (): void {
 
     try {
         $contents = file_get_contents($tmp);
-        if (!is_string($contents)) {
+        if (! is_string($contents)) {
             throw new RuntimeException('Could not read test JAR.');
         }
 
-        $reflection = new ReflectionClass(BlueWolf\MinecraftToolkit\Services\MinecraftServerFileService::class);
+        $reflection = new ReflectionClass(MinecraftServerFileService::class);
         $service = $reflection->newInstanceWithoutConstructor();
         $metadata = $service->inspectJarContents($contents);
 
@@ -271,6 +325,16 @@ $tests['JAR inspection metadata'] = function (): void {
     } finally {
         @unlink($tmp);
     }
+};
+
+$tests['modpack server archive paths'] = function (): void {
+    $reflection = new ReflectionClass(BlueWolf\MinecraftToolkit\Services\MinecraftModpackService::class);
+    $service = $reflection->newInstanceWithoutConstructor();
+
+    assertSame('/mods/example.jar', invokePrivate($service, 'archiveTargetPath', ['mods/example.jar']));
+    assertSame('/config/example.toml', invokePrivate($service, 'archiveTargetPath', ['overrides/config/example.toml']));
+    assertSame('/mods/example.jar', invokePrivate($service, 'archiveTargetPath', ['ServerPack/mods/example.jar']));
+    assertSame('/manifest.json', invokePrivate($service, 'archiveTargetPath', ['manifest.json']));
 };
 
 $tests['targeted Geyser YAML patch'] = function (): void {
@@ -290,12 +354,12 @@ YAML;
 
     $patched = $service->patchConfig($original, 19133);
 
-    assertContains("  address: 0.0.0.0", $patched);
-    assertContains("  port: 19133", $patched);
-    assertContains("  clone-remote-port: false", $patched);
-    assertContains("  auth-type: floodgate", $patched);
-    assertContains("  motd1: Geyser", $patched);
-    assertContains("custom-setting: keep", $patched);
+    assertContains('  address: 0.0.0.0', $patched);
+    assertContains('  port: 19133', $patched);
+    assertContains('  clone-remote-port: false', $patched);
+    assertContains('  auth-type: floodgate', $patched);
+    assertContains('  motd1: Geyser', $patched);
+    assertContains('custom-setting: keep', $patched);
 };
 
 $tests['Modrinth update candidate normalization'] = function (): void {
@@ -351,7 +415,7 @@ $tests['package compatibility classification'] = function (): void {
         public function updateCandidate(string $projectId, MinecraftToolkitSetup $setup): array
         {
             if ($projectId === 'missing') {
-                throw new BlueWolf\MinecraftToolkit\Exceptions\MinecraftToolkitException(
+                throw new MinecraftToolkitException(
                     'Keine kompatible Paketversion wurde gefunden.'
                 );
             }
@@ -385,6 +449,8 @@ $tests['package compatibility classification'] = function (): void {
     };
     $curseForge = new class extends CurseForgeService
     {
+        public function __construct() {}
+
         public function updateCandidate(string $projectId, MinecraftToolkitSetup $setup): array
         {
             return [
@@ -402,12 +468,12 @@ $tests['package compatibility classification'] = function (): void {
         $modrinth,
         $curseForge,
         $geyser,
-        new MinecraftSoftwareService()
+        new MinecraftSoftwareService
     );
-    $target = new MinecraftToolkitSetup();
+    $target = new MinecraftToolkitSetup;
     $target->forceFill(['software' => 'paper', 'minecraft_version' => '1.21.4']);
 
-    $compatible = new MinecraftToolkitPackage();
+    $compatible = new MinecraftToolkitPackage;
     $compatible->forceFill([
         'id' => 1,
         'project_name' => 'Same',
@@ -418,7 +484,7 @@ $tests['package compatibility classification'] = function (): void {
     ]);
     assertSame('compatible', $service->checkPackage($compatible, $target)['status']);
 
-    $update = new MinecraftToolkitPackage();
+    $update = new MinecraftToolkitPackage;
     $update->forceFill([
         'id' => 2,
         'project_name' => 'Update',
@@ -429,7 +495,7 @@ $tests['package compatibility classification'] = function (): void {
     ]);
     assertSame('update_required', $service->checkPackage($update, $target)['status']);
 
-    $pinned = new MinecraftToolkitPackage();
+    $pinned = new MinecraftToolkitPackage;
     $pinned->forceFill([
         'id' => 22,
         'project_name' => 'Pinned Update',
@@ -441,7 +507,7 @@ $tests['package compatibility classification'] = function (): void {
     ]);
     assertSame('pinned', $service->checkPackage($pinned, $target)['status']);
 
-    $missing = new MinecraftToolkitPackage();
+    $missing = new MinecraftToolkitPackage;
     $missing->forceFill([
         'id' => 3,
         'project_name' => 'Missing',
@@ -452,7 +518,7 @@ $tests['package compatibility classification'] = function (): void {
     ]);
     assertSame('incompatible', $service->checkPackage($missing, $target)['status']);
 
-    $system = new MinecraftToolkitPackage();
+    $system = new MinecraftToolkitPackage;
     $system->forceFill([
         'id' => 4,
         'project_name' => 'Geyser',
@@ -464,7 +530,7 @@ $tests['package compatibility classification'] = function (): void {
     ]);
     assertSame('system_update', $service->checkPackage($system, $target)['status']);
 
-    $manual = new MinecraftToolkitPackage();
+    $manual = new MinecraftToolkitPackage;
     $manual->forceFill([
         'id' => 5,
         'project_name' => 'Manual',
@@ -474,7 +540,7 @@ $tests['package compatibility classification'] = function (): void {
     ]);
     assertSame('unknown', $service->checkPackage($manual, $target)['status']);
 
-    $curse = new MinecraftToolkitPackage();
+    $curse = new MinecraftToolkitPackage;
     $curse->forceFill([
         'id' => 6,
         'project_name' => 'Curse Project',
@@ -487,13 +553,13 @@ $tests['package compatibility classification'] = function (): void {
 };
 
 $tests['CurseForge loader and search mapping'] = function (): void {
-    $service = new CurseForgeService();
+    $service = new CurseForgeService(new CurseForgeApiKeyProvider);
     assertSame(1, $service->loaderType('forge'));
     assertSame(4, $service->loaderType('fabric'));
     assertSame(6, $service->loaderType('neoforge'));
     assertSame(null, $service->loaderType('paper'));
 
-    $paper = new MinecraftToolkitSetup();
+    $paper = new MinecraftToolkitSetup;
     $paper->forceFill(['software' => 'paper', 'minecraft_version' => '1.21.4']);
     assertSame([
         'gameId' => 432,
@@ -501,7 +567,7 @@ $tests['CurseForge loader and search mapping'] = function (): void {
         'gameVersion' => '1.21.4',
     ], $service->searchParameters($paper));
 
-    $fabric = new MinecraftToolkitSetup();
+    $fabric = new MinecraftToolkitSetup;
     $fabric->forceFill(['software' => 'fabric', 'minecraft_version' => '1.21.4']);
     assertSame([
         'gameId' => 432,
@@ -512,7 +578,7 @@ $tests['CurseForge loader and search mapping'] = function (): void {
 };
 
 $tests['CurseForge normalization'] = function (): void {
-    $service = new CurseForgeService();
+    $service = new CurseForgeService(new CurseForgeApiKeyProvider);
     $results = $service->normalizeSearchResults([[
         'id' => 238222,
         'slug' => 'jei',
@@ -553,7 +619,7 @@ exit($failed === 0 ? 0 : 1);
 
 function assertContains(string $needle, string $haystack): void
 {
-    if (!str_contains($haystack, $needle)) {
+    if (! str_contains($haystack, $needle)) {
         throw new RuntimeException("Expected output to contain: $needle");
     }
 }

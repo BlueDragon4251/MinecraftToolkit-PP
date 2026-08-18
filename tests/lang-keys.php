@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 $base = dirname(__DIR__);
 $locales = [
-    'en' => require $base . '/lang/en/strings.php',
-    'de' => require $base . '/lang/de/strings.php',
+    'en' => require $base.'/lang/en/strings.php',
+    'de' => require $base.'/lang/de/strings.php',
 ];
 
 /** @return list<string> */
@@ -13,9 +13,10 @@ function flattenKeys(array $values, string $prefix = ''): array
 {
     $keys = [];
     foreach ($values as $key => $value) {
-        $path = $prefix === '' ? (string) $key : $prefix . '.' . (string) $key;
+        $path = $prefix === '' ? (string) $key : $prefix.'.'.(string) $key;
         if (is_array($value)) {
             array_push($keys, ...flattenKeys($value, $path));
+
             continue;
         }
 
@@ -30,9 +31,10 @@ function mojibakeValues(array $values, string $prefix = ''): array
 {
     $bad = [];
     foreach ($values as $key => $value) {
-        $path = $prefix === '' ? (string) $key : $prefix . '.' . (string) $key;
+        $path = $prefix === '' ? (string) $key : $prefix.'.'.(string) $key;
         if (is_array($value)) {
             array_push($bad, ...mojibakeValues($value, $path));
+
             continue;
         }
 
@@ -60,13 +62,13 @@ foreach ($locales as $locale => $strings) {
         $failed = true;
         echo "Locale {$locale} failed translation QA.\n";
         if ($missing !== []) {
-            echo 'Missing keys: ' . implode(', ', $missing) . "\n";
+            echo 'Missing keys: '.implode(', ', $missing)."\n";
         }
         if ($extra !== []) {
-            echo 'Extra keys: ' . implode(', ', $extra) . "\n";
+            echo 'Extra keys: '.implode(', ', $extra)."\n";
         }
         if ($mojibake !== []) {
-            echo 'Possible mojibake: ' . implode(', ', $mojibake) . "\n";
+            echo 'Possible mojibake: '.implode(', ', $mojibake)."\n";
         }
     }
 }

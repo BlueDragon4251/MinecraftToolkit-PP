@@ -36,7 +36,7 @@ class MinecraftVersionChangeService
         ?string $loaderVersion,
         string $mode
     ): array {
-        if (!in_array($mode, ['safe', 'remove', 'risk'], true)) {
+        if (! in_array($mode, ['safe', 'remove', 'risk'], true)) {
             throw new MinecraftToolkitException('Die gewählte Wechselstrategie ist ungültig.');
         }
         if ($minecraftVersion === $setup->minecraft_version
@@ -52,7 +52,7 @@ class MinecraftVersionChangeService
 
         /** @var Lock $lock */
         $lock = Cache::lock("minecrafttoolkit.version-change.{$server->uuid}", 1200);
-        if (!$lock->get()) {
+        if (! $lock->get()) {
             throw new MinecraftToolkitException('Für diesen Server läuft bereits ein Versionswechsel.');
         }
 
@@ -73,13 +73,13 @@ class MinecraftVersionChangeService
                 ->where('server_uuid', $server->uuid)
                 ->whereIn('package_type', ['server_jar', 'server_binary'])
                 ->first();
-            if (!$serverPackage instanceof MinecraftToolkitPackage) {
+            if (! $serverPackage instanceof MinecraftToolkitPackage) {
                 throw new MinecraftToolkitException(
                     'Die verwaltete Serverdatei wurde nicht gefunden. Führe das Minecraft-Setup erneut aus.'
                 );
             }
             $oldArtifact = $serverPackage->file_path;
-            $newArtifact = '/' . $download['file_name'];
+            $newArtifact = '/'.$download['file_name'];
             if ($newArtifact !== $oldArtifact && $this->files->exists($server, $newArtifact)) {
                 throw new MinecraftToolkitException(
                     "Die neue Serverdatei {$download['file_name']} existiert bereits."
@@ -123,7 +123,7 @@ class MinecraftVersionChangeService
                     $setup->forceFill([
                         'minecraft_version' => $minecraftVersion,
                         'loader_version' => $targetSetup->loader_version,
-                        'server_jar_path' => (!$download['installer'] && !$isBedrock) ? $newArtifact : null,
+                        'server_jar_path' => (! $download['installer'] && ! $isBedrock) ? $newArtifact : null,
                         'server_binary_path' => $isBedrock ? '/bedrock_server' : ($download['installer'] ? '/run.sh' : null),
                         'last_error' => null,
                     ])->saveOrFail();
@@ -163,7 +163,7 @@ class MinecraftVersionChangeService
             $failed = count($removal['errors']);
             $errors = $removal['errors'];
             foreach ($report['packages'] as $result) {
-                if (!in_array($result['status'], ['update_required', 'system_update'], true)) {
+                if (! in_array($result['status'], ['update_required', 'system_update'], true)) {
                     continue;
                 }
 
@@ -216,7 +216,7 @@ class MinecraftVersionChangeService
         string $minecraftVersion,
         ?string $loaderVersion
     ): array {
-        if (!array_key_exists($minecraftVersion, $this->software->versionOptions($setup->software))) {
+        if (! array_key_exists($minecraftVersion, $this->software->versionOptions($setup->software))) {
             throw new MinecraftToolkitException('Die gewählte Minecraft-Version ist für diese Software nicht verfügbar.');
         }
 
@@ -235,7 +235,7 @@ class MinecraftVersionChangeService
             $this->files->downloadJar(
                 $server,
                 $download['url'],
-                '/' . $download['file_name'],
+                '/'.$download['file_name'],
                 ['sha256' => $download['sha256']]
             );
 
@@ -246,14 +246,14 @@ class MinecraftVersionChangeService
     }
 
     /** @param array<int, array<string, mixed>> $results
-     *  @return array{removed: int, errors: string[]}
+     * @return array{removed: int, errors: string[]}
      */
     private function removeBlockingPackages(Server $server, array $results): array
     {
         $removed = 0;
         $errors = [];
         foreach ($results as $result) {
-            if (!in_array($result['status'], ['incompatible', 'unknown', 'pinned'], true)) {
+            if (! in_array($result['status'], ['incompatible', 'unknown', 'pinned'], true)) {
                 continue;
             }
 
@@ -262,7 +262,7 @@ class MinecraftVersionChangeService
                 ->where('server_uuid', $server->uuid)
                 ->where('enabled', true)
                 ->first();
-            if (!$package instanceof MinecraftToolkitPackage) {
+            if (! $package instanceof MinecraftToolkitPackage) {
                 continue;
             }
 
@@ -295,7 +295,7 @@ class MinecraftVersionChangeService
             if ($backup !== null) {
                 $this->files->move($server, $backup, $oldArtifact);
             }
-            if ($runBackup !== null && !$this->files->exists($server, '/run.sh')) {
+            if ($runBackup !== null && ! $this->files->exists($server, '/run.sh')) {
                 $this->files->move($server, $runBackup, '/run.sh');
             }
         } catch (\Throwable $exception) {
@@ -315,9 +315,9 @@ class MinecraftVersionChangeService
         $this->riskGate->assertAllowed('startup_edits', $server);
 
         $user = user();
-        if ($user === null || (!$user->isRootAdmin()
+        if ($user === null || (! $user->isRootAdmin()
             && $server->owner_id !== $user->id
-            && !$user->can(SubuserPermission::StartupUpdate, $server))) {
+            && ! $user->can(SubuserPermission::StartupUpdate, $server))) {
             throw new MinecraftToolkitException(
                 'Für diesen Versionswechsel wird die Berechtigung zum Ändern des Startbefehls benötigt.'
             );

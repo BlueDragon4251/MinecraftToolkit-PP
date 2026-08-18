@@ -63,18 +63,18 @@ class MinecraftVersionChangePage extends Page implements HasSchemas
 
     public static function canAccess(): bool
     {
-        if (!(bool) config('minecrafttoolkit.enabled', true)
-            || !(bool) config('minecrafttoolkit.version_change_enabled', true)
-            || !Schema::hasTable('minecraft_toolkit_setups')
-            || !Schema::hasTable('minecraft_toolkit_packages')) {
+        if (! (bool) config('minecrafttoolkit.enabled', true)
+            || ! (bool) config('minecrafttoolkit.version_change_enabled', true)
+            || ! Schema::hasTable('minecraft_toolkit_setups')
+            || ! Schema::hasTable('minecraft_toolkit_packages')) {
             return false;
         }
 
         $server = Filament::getTenant();
         $user = user();
         if ($user !== null
-            && !(bool) config('minecrafttoolkit.version_change_users_enabled', true)
-            && !$user->isRootAdmin()) {
+            && ! (bool) config('minecrafttoolkit.version_change_users_enabled', true)
+            && ! $user->isRootAdmin()) {
             return false;
         }
 
@@ -176,7 +176,7 @@ class MinecraftVersionChangePage extends Page implements HasSchemas
                 (string) $state['minecraft_version'],
                 is_string($state['loader_version'] ?? null) ? $state['loader_version'] : null
             );
-            Notification::make()
+            $notification = Notification::make()
                 ->title(trans('minecrafttoolkit::strings.version_change.check_complete'))
                 ->body(($this->report['blocking'] ?? 0) > 0
                     ? trans('minecrafttoolkit::strings.version_change.blocking_body', ['count' => $this->report['blocking']])
@@ -205,7 +205,7 @@ class MinecraftVersionChangePage extends Page implements HasSchemas
         }
 
         $state = $this->form->getState();
-        if ($mode === 'remove' && !($state['confirm_remove'] ?? false)) {
+        if ($mode === 'remove' && ! ($state['confirm_remove'] ?? false)) {
             $this->notifyError(
                 trans('minecrafttoolkit::strings.version_change.confirmation_missing'),
                 new MinecraftToolkitException(trans('minecrafttoolkit::strings.version_change.confirm_remove_first'))
@@ -213,7 +213,7 @@ class MinecraftVersionChangePage extends Page implements HasSchemas
 
             return;
         }
-        if ($mode === 'risk' && !($state['confirm_risk'] ?? false)) {
+        if ($mode === 'risk' && ! ($state['confirm_risk'] ?? false)) {
             $this->notifyError(
                 trans('minecrafttoolkit::strings.version_change.confirmation_missing'),
                 new MinecraftToolkitException(trans('minecrafttoolkit::strings.version_change.confirm_risk_first'))
@@ -238,9 +238,11 @@ class MinecraftVersionChangePage extends Page implements HasSchemas
                     'removed' => $result['removed'],
                     'failed' => $result['failed'],
                 ]))
-                ->status($result['failed'] > 0 ? 'warning' : 'success')
-                ->persistent($result['failed'] > 0)
-                ->send();
+                ->status($result['failed'] > 0 ? 'warning' : 'success');
+            if ($result['failed'] > 0) {
+                $notification->persistent();
+            }
+            $notification->send();
             $this->redirect(static::getUrl(panel: 'server', tenant: $this->server()));
         } catch (MinecraftToolkitException $exception) {
             $this->notifyError(trans('minecrafttoolkit::strings.version_change.change_failed'), $exception);

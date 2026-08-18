@@ -15,7 +15,7 @@ class GeyserDownloadService
     /** @return array{project: string, version: string, build: string, file_name: string, url: string, sha256: string} */
     public function latestSpigot(string $project): array
     {
-        if (!in_array($project, ['geyser', 'floodgate'], true)) {
+        if (! in_array($project, ['geyser', 'floodgate'], true)) {
             throw new MinecraftToolkitException('Unbekanntes GeyserMC-Projekt.');
         }
 
@@ -25,17 +25,17 @@ class GeyserDownloadService
             function () use ($project): array {
                 $metadata = $this->get("/projects/$project");
                 $version = collect($metadata['versions'] ?? [])->last();
-                if (!is_string($version)) {
+                if (! is_string($version)) {
                     throw new MinecraftToolkitException("Für $project wurde keine Version gefunden.");
                 }
 
                 $build = $this->get("/projects/$project/versions/$version/builds/latest");
                 $buildNumber = $build['build'] ?? null;
                 $download = $build['downloads']['spigot'] ?? null;
-                if ((!is_int($buildNumber) && !is_string($buildNumber))
-                    || !is_array($download)
-                    || !is_string($download['name'] ?? null)
-                    || !is_string($download['sha256'] ?? null)) {
+                if ((! is_int($buildNumber) && ! is_string($buildNumber))
+                    || ! is_array($download)
+                    || ! is_string($download['name'] ?? null)
+                    || ! is_string($download['sha256'] ?? null)) {
                     throw new MinecraftToolkitException("Für $project wurde kein Spigot-Download gefunden.");
                 }
 
@@ -44,7 +44,7 @@ class GeyserDownloadService
                     'version' => $version,
                     'build' => (string) $buildNumber,
                     'file_name' => $download['name'],
-                    'url' => self::API . "/projects/$project/versions/$version/builds/$buildNumber/downloads/spigot",
+                    'url' => self::API."/projects/$project/versions/$version/builds/$buildNumber/downloads/spigot",
                     'sha256' => $download['sha256'],
                 ];
             }
@@ -59,7 +59,7 @@ class GeyserDownloadService
                 ->withUserAgent((string) config('minecrafttoolkit.user_agent'))
                 ->connectTimeout(5)
                 ->timeout((int) config('minecrafttoolkit.http_timeout', 20))
-                ->get(self::API . $path)
+                ->get(self::API.$path)
                 ->throw()
                 ->json();
         } catch (MinecraftToolkitException $exception) {

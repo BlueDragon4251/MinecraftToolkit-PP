@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master, developement]
+  pull_request:
+    branches: [main, master, developement]
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { path: plugin }
+      - uses: actions/checkout@v4
+        with: { repository: pelican-dev/panel, path: pelican }
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: intl, mbstring, xml, ctype, json, bcmath, pdo, sqlite, zip, gd
+          tools: composer, phpstan, pint
+      - name: Install Pelican dependencies
+        working-directory: pelican
+        run: composer install --no-interaction --prefer-dist --no-scripts
+      - name: Check formatting
+        run: pint --test plugin
+      - name: Run PHPStan
+        working-directory: plugin
+        run: phpstan analyse --no-progress --memory-limit=1G
+      - name: Run focused tests
+        run: php plugin/tests/run.php
+      - name: Check translations
+        run: php plugin/tests/lang-keys.php

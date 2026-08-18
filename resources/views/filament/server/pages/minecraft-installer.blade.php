@@ -92,6 +92,10 @@
                     </div>
                 @endif
 
+                @if (!empty($candidate['version']['changelog']))
+                    <details class="rounded-lg border border-gray-200 p-3 text-sm dark:border-white/10"><summary class="cursor-pointer font-medium">{{ trans('minecrafttoolkit::strings.installer.changelog') }}</summary><div class="mt-3 whitespace-pre-wrap text-gray-600 dark:text-gray-300">{{ Str::limit(strip_tags((string) $candidate['version']['changelog']), 8000) }}</div></details>
+                @endif
+
                 <div>
                     <h4 class="font-medium">{{ trans('minecrafttoolkit::strings.installer.dependencies') }}</h4>
                     <div class="mt-2 space-y-2">
@@ -101,6 +105,9 @@
                                     <span class="font-medium">{{ $dependency['title'] }}</span>
                                     <span class="ml-2 text-xs uppercase text-gray-500">{{ $dependency['type'] }}</span>
                                 </div>
+                                @if (!$dependency['installed'] && $dependency['project_id'] && in_array($dependency['type'], ['optional', 'recommended', 'embedded'], true))
+                                    <label class="flex items-center gap-2 text-sm"><input type="checkbox" wire:model="optionalDependencyIds" value="{{ $dependency['project_id'] }}"> {{ trans('minecrafttoolkit::strings.installer.install_optional') }}</label>
+                                @endif
                                 <span class="text-sm {{ $dependency['installed'] ? 'text-success-600' : ($dependency['type'] === 'required' ? 'text-danger-600' : 'text-gray-500') }}">
                                     {{ $dependency['installed'] ? trans('minecrafttoolkit::strings.installer.installed') : trans('minecrafttoolkit::strings.installer.not_installed') }}
                                 </span>

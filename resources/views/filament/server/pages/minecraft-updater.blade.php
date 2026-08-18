@@ -15,6 +15,9 @@
         <x-filament::button wire:click="verifyAllPackages" icon="tabler-shield-check" color="info" :disabled="$packages === []" wire:loading.attr="disabled">
             {{ trans('minecrafttoolkit::strings.updater.verify_all') }}
         </x-filament::button>
+        <x-filament::button wire:click="disableAllPackages" icon="tabler-player-pause" color="danger" :disabled="$packages === []" wire:confirm="{{ trans('minecrafttoolkit::strings.updater.disable_all_confirm') }}" wire:loading.attr="disabled">
+            {{ trans('minecrafttoolkit::strings.updater.disable_all') }}
+        </x-filament::button>
     </div>
 
     <x-filament::section :heading="trans('minecrafttoolkit::strings.updater.managed_packages')">
@@ -30,6 +33,9 @@
                             @endif
                             @if ($package['pinned'])
                                 <span class="text-xs text-warning-600">{{ trans('minecrafttoolkit::strings.updater.pinned') }}</span>
+                            @endif
+                            @if (! $package['enabled'])
+                                <span class="text-xs text-danger-600">{{ trans('minecrafttoolkit::strings.updater.disabled') }}</span>
                             @endif
                         </div>
                         <div class="mt-1 text-sm text-gray-500">
@@ -92,8 +98,23 @@
                                 <div>{{ trans('minecrafttoolkit::strings.updater.project_id') }}: <code>{{ $package['project_id'] }}</code></div>
                             @endif
                         </div>
+                        @if(user()?->isRootAdmin())
+                            <div class="mt-3 flex gap-2"><input class="fi-input block w-full rounded-lg border-gray-300 bg-transparent px-3 py-2 text-sm" wire:model="packageNotes.{{ $package['id'] }}" placeholder="{{ trans('minecrafttoolkit::strings.updater.admin_note') }}"><x-filament::button size="xs" color="gray" wire:click="savePackageNote({{ $package['id'] }})">{{ trans('minecrafttoolkit::strings.updater.save_note') }}</x-filament::button></div>
+                        @elseif($package['admin_notes'])
+                            <p class="mt-2 text-xs text-warning-600">{{ $package['admin_notes'] }}</p>
+                        @endif
                     </div>
                     <div class="flex flex-wrap gap-2 md:justify-end">
+                        @if ($package['can_disable'])
+                            <x-filament::button size="sm" color="gray" wire:click="togglePackage({{ $package['id'] }}, {{ $package['enabled'] ? 'false' : 'true' }})" wire:loading.attr="disabled">
+                                {{ $package['enabled'] ? trans('minecrafttoolkit::strings.updater.disable') : trans('minecrafttoolkit::strings.updater.enable') }}
+                            </x-filament::button>
+                        @endif
+                        @if ($package['enabled'])
+                            <x-filament::button size="sm" color="gray" wire:click="reinstallPackage({{ $package['id'] }})" wire:confirm="{{ trans('minecrafttoolkit::strings.updater.reinstall_confirm') }}" wire:loading.attr="disabled">
+                                {{ trans('minecrafttoolkit::strings.updater.reinstall') }}
+                            </x-filament::button>
+                        @endif
                         @if ($package['status'] === 'update_available' && ! $package['pinned'])
                             <x-filament::button size="sm" wire:click="updatePackage({{ $package['id'] }})" wire:loading.attr="disabled">
                                 {{ trans('minecrafttoolkit::strings.updater.update') }}

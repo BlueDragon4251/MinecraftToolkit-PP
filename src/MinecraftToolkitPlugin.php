@@ -6,8 +6,8 @@ namespace BlueWolf\MinecraftToolkit;
 
 use App\Contracts\Plugins\HasPluginSettings;
 use App\Traits\EnvironmentWriterTrait;
-use Filament\Contracts\Plugin;
 use BlueWolf\MinecraftToolkit\Services\CurseForgeApiKeyProvider;
+use Filament\Contracts\Plugin;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
@@ -37,6 +37,40 @@ class MinecraftToolkitPlugin implements HasPluginSettings, Plugin
     }
 
     public function boot(Panel $panel): void {}
+
+    /** @return array<string, mixed> */
+    public function getSettingsFormData(): array
+    {
+        return [
+            'enabled' => (bool) config('minecrafttoolkit.enabled', true),
+            'admins_only' => (bool) config('minecrafttoolkit.admins_only', false),
+            'backup_before_overwrite' => (bool) config('minecrafttoolkit.backup_before_overwrite', true),
+            'modrinth_enabled' => (bool) config('minecrafttoolkit.modrinth_enabled', true),
+            'curseforge_enabled' => (bool) config('minecrafttoolkit.curseforge_enabled', true),
+            'curseforge_proxy_url' => (string) config('minecrafttoolkit.curseforge_proxy_url', ''),
+            'updater_enabled' => (bool) config('minecrafttoolkit.updater_enabled', true),
+            'version_change_enabled' => (bool) config('minecrafttoolkit.version_change_enabled', true),
+            'version_change_users_enabled' => (bool) config('minecrafttoolkit.version_change_users_enabled', true),
+            'crossplay_enabled' => (bool) config('minecrafttoolkit.crossplay_enabled', true),
+            'bedrock_port_required' => (bool) config('minecrafttoolkit.bedrock_port_required', true),
+            'security_audit_log_enabled' => (bool) config('minecrafttoolkit.security_audit_log_enabled', true),
+            'risk_gate_startup_edits_admin_only' => (bool) config('minecrafttoolkit.risk_gate_startup_edits_admin_only', false),
+            'risk_gate_version_risk_admin_only' => (bool) config('minecrafttoolkit.risk_gate_version_risk_admin_only', false),
+            'risk_gate_package_removal_admin_only' => (bool) config('minecrafttoolkit.risk_gate_package_removal_admin_only', false),
+            'risk_gate_curseforge_usage_admin_only' => (bool) config('minecrafttoolkit.risk_gate_curseforge_usage_admin_only', false),
+            'risk_gate_crossplay_setup_admin_only' => (bool) config('minecrafttoolkit.risk_gate_crossplay_setup_admin_only', false),
+            'risk_gate_raw_properties_admin_only' => (bool) config('minecrafttoolkit.risk_gate_raw_properties_admin_only', false),
+            'http_timeout' => (int) config('minecrafttoolkit.http_timeout', 20),
+            'download_timeout' => (int) config('minecrafttoolkit.download_timeout', 300),
+            'java_class_version_max' => (int) config('minecrafttoolkit.java_class_version_max', 69),
+            'compatibility_cache_minutes' => (int) config('minecrafttoolkit.compatibility_cache_minutes', 30),
+            'scheduled_update_checks' => (bool) config('minecrafttoolkit.scheduled_update_checks', true),
+            'post_update_health_check' => (bool) config('minecrafttoolkit.post_update_health_check', false),
+            'post_update_health_wait_seconds' => (int) config('minecrafttoolkit.post_update_health_wait_seconds', 60),
+            'blueit_announcements_enabled' => (bool) config('minecrafttoolkit.blueit_announcements_enabled', true),
+            'blueit_announcements_url' => (string) config('minecrafttoolkit.blueit_announcements_url', ''),
+        ];
+    }
 
     public function getSettingsForm(): array
     {
@@ -139,12 +173,31 @@ class MinecraftToolkitPlugin implements HasPluginSettings, Plugin
                 ->minValue(30)
                 ->required()
                 ->default((int) config('minecrafttoolkit.download_timeout', 300)),
+            TextInput::make('java_class_version_max')
+                ->label(trans('minecrafttoolkit::strings.settings.java_class_version_max'))
+                ->helperText(trans('minecrafttoolkit::strings.settings.java_class_version_max_help'))
+                ->numeric()
+                ->minValue(0)
+                ->maxValue(100)
+                ->required()
+                ->default((int) config('minecrafttoolkit.java_class_version_max', 69)),
             TextInput::make('compatibility_cache_minutes')
                 ->label(trans('minecrafttoolkit::strings.settings.compatibility_cache_minutes'))
                 ->numeric()
                 ->minValue(0)
                 ->required()
                 ->default((int) config('minecrafttoolkit.compatibility_cache_minutes', 30)),
+            Toggle::make('scheduled_update_checks')
+                ->label(trans('minecrafttoolkit::strings.settings.scheduled_update_checks'))
+                ->default((bool) config('minecrafttoolkit.scheduled_update_checks', true)),
+            Toggle::make('post_update_health_check')
+                ->label(trans('minecrafttoolkit::strings.settings.post_update_health_check'))
+                ->helperText(trans('minecrafttoolkit::strings.settings.post_update_health_check_help'))
+                ->default((bool) config('minecrafttoolkit.post_update_health_check', false)),
+            TextInput::make('post_update_health_wait_seconds')
+                ->label(trans('minecrafttoolkit::strings.settings.post_update_health_wait'))
+                ->numeric()->minValue(15)->maxValue(300)->required()
+                ->default((int) config('minecrafttoolkit.post_update_health_wait_seconds', 60)),
             Toggle::make('blueit_announcements_enabled')
                 ->label(trans('minecrafttoolkit::strings.settings.blueit_announcements_enabled'))
                 ->default((bool) config('minecrafttoolkit.blueit_announcements_enabled', true)),
@@ -183,7 +236,11 @@ class MinecraftToolkitPlugin implements HasPluginSettings, Plugin
             'MINECRAFT_TOOLKIT_RISK_GATE_RAW_PROPERTIES_ADMIN_ONLY' => $this->boolSetting($data, 'risk_gate_raw_properties_admin_only', false),
             'MINECRAFT_TOOLKIT_HTTP_TIMEOUT' => max(5, (int) ($data['http_timeout'] ?? 20)),
             'MINECRAFT_TOOLKIT_DOWNLOAD_TIMEOUT' => max(30, (int) ($data['download_timeout'] ?? 300)),
+            'MINECRAFT_TOOLKIT_JAVA_CLASS_VERSION_MAX' => max(0, min(100, (int) ($data['java_class_version_max'] ?? 69))),
             'MINECRAFT_TOOLKIT_COMPATIBILITY_CACHE_MINUTES' => max(0, (int) ($data['compatibility_cache_minutes'] ?? 30)),
+            'MINECRAFT_TOOLKIT_SCHEDULED_UPDATE_CHECKS' => $this->boolSetting($data, 'scheduled_update_checks', true),
+            'MINECRAFT_TOOLKIT_POST_UPDATE_HEALTH_CHECK' => $this->boolSetting($data, 'post_update_health_check', false),
+            'MINECRAFT_TOOLKIT_POST_UPDATE_HEALTH_WAIT' => max(15, min(300, (int) ($data['post_update_health_wait_seconds'] ?? 60))),
             'MINECRAFT_TOOLKIT_BLUEIT_ANNOUNCEMENTS_ENABLED' => $this->boolSetting($data, 'blueit_announcements_enabled', true),
         ];
 

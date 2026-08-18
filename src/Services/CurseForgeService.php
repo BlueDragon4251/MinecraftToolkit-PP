@@ -16,6 +16,10 @@ class CurseForgeService
 
     private const API = 'https://api.curseforge.com/v1';
 
+    private const DEFAULT_PROXY_URL = 'https://blueit42.vercel.app/api/curseforge/proxy';
+
+    private const DEFAULT_PROXY_SECRET = 'blueit42-minecraft-toolkit-proxy-v1';
+
     private const MINECRAFT_GAME_ID = 432;
 
     private const BUKKIT_CLASS_ID = 5;
@@ -37,7 +41,7 @@ class CurseForgeService
             'sortOrder' => 'desc',
             'pageSize' => min(max($limit, 1), 50),
         ];
-        $key = 'minecrafttoolkit.curseforge.search.' . sha1(json_encode($params, JSON_THROW_ON_ERROR));
+        $key = 'minecrafttoolkit.curseforge.search.'.sha1(json_encode($params, JSON_THROW_ON_ERROR));
         $response = Cache::remember(
             $key,
             now()->addMinutes(10),
@@ -52,7 +56,7 @@ class CurseForgeService
     {
         $this->assertEnabled();
 
-        if (!in_array($setup->software, ['paper', 'purpur', 'folia', 'fabric', 'forge', 'neoforge'], true)) {
+        if (! in_array($setup->software, ['paper', 'purpur', 'folia', 'fabric', 'forge', 'neoforge'], true)) {
             return [];
         }
 
@@ -62,7 +66,7 @@ class CurseForgeService
             'index' => max(0, $offset),
             'pageSize' => min(max($limit, 1), 50),
         ];
-        $key = 'minecrafttoolkit.curseforge.popular.' . sha1(json_encode($params, JSON_THROW_ON_ERROR));
+        $key = 'minecrafttoolkit.curseforge.popular.'.sha1(json_encode($params, JSON_THROW_ON_ERROR));
         $response = Cache::remember(
             $key,
             now()->addMinutes(10),
@@ -88,7 +92,7 @@ class CurseForgeService
             $params['searchFilter'] = trim($query);
         }
 
-        $key = 'minecrafttoolkit.curseforge.modpacks.' . sha1(json_encode($params, JSON_THROW_ON_ERROR));
+        $key = 'minecrafttoolkit.curseforge.modpacks.'.sha1(json_encode($params, JSON_THROW_ON_ERROR));
         $response = Cache::remember(
             $key,
             now()->addMinutes(10),
@@ -99,22 +103,23 @@ class CurseForgeService
     }
 
     /** @return array{project: array<string, mixed>, file: array<string, mixed>} */
-    public function modpackFile(string $projectId): array
+    public function modpackFile(string $projectId, ?string $versionId = null): array
     {
         $this->assertEnabled();
-        if (!ctype_digit($projectId) || (int) $projectId <= 0) {
+        if (! ctype_digit($projectId) || (int) $projectId <= 0) {
             throw new MinecraftToolkitException('Die CurseForge-Modpack-ID ist ungültig.');
         }
 
         $project = $this->project((int) $projectId);
-        $response = $this->get("/mods/$projectId/files", ['pageSize' => 50]);
-        $file = collect($response['data'] ?? [])
-            ->filter(fn (mixed $candidate): bool => is_array($candidate))
+        $file = collect($this->rawModpackFiles($projectId))
+            ->filter(fn (array $candidate): bool => $versionId === null || (string) ($candidate['id'] ?? '') === $versionId)
             ->sortByDesc(fn (array $candidate): string => (string) ($candidate['fileDate'] ?? ''))
             ->first();
-        if (!is_array($file)) {
+        if (! is_array($file)) {
             throw new MinecraftToolkitException('Für dieses CurseForge-Modpack wurde keine Datei gefunden.');
         }
+
+        $file = $this->serverPackFile($projectId, $file);
 
         $downloadUrl = is_string($file['downloadUrl'] ?? null) ? $file['downloadUrl'] : null;
         if ($downloadUrl === null && isset($file['id'])) {
@@ -137,26 +142,98 @@ class CurseForgeService
         ];
     }
 
-    public function fileDownloadUrl(string $projectId, string $fileId): string
+    /** @return array<int, array{id: string, display_name: string}> */
+    public function modpackFiles(string $projectId): array
     {
         $this->assertEnabled();
-        if (!ctype_digit($projectId) || !ctype_digit($fileId)) {
+        if (! ctype_digit($projectId) || (int) $projectId <= 0) {
+            throw new MinecraftToolkitException('Die CurseForge-Modpack-ID ist ungültig.');
+        }
+
+        return collect($this->rawModpackFiles($projectId))
+            ->reject(fn (array $file): bool => $this->isServerPack($file))
+            ->sortByDesc(fn (array $file): string => (string) ($file['fileDate'] ?? ''))
+            ->map(fn (array $file): array => [
+                'id' => (string) ($file['id'] ?? ''),
+                'display_name' => (string) ($file['displayName'] ?? $file['fileName'] ?? $file['id'] ?? ''),
+            ])->filter(fn (array $file): bool => $file['id'] !== '')
+            ->values()->all();
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    private function rawModpackFiles(string $projectId): array
+    {
+        $response = $this->get("/mods/$projectId/files", ['pageSize' => 50]);
+
+        return collect($response['data'] ?? [])->filter(fn (mixed $file): bool => is_array($file))->values()->all();
+    }
+
+    /** @param array<string, mixed> $file
+     * @return array<string, mixed>
+     */
+    private function serverPackFile(string $projectId, array $file): array
+    {
+        if ($this->isServerPack($file)) {
+            return $file;
+        }
+
+        $serverPackFileId = $file['serverPackFileId'] ?? null;
+        if (! is_int($serverPackFileId) && ! is_string($serverPackFileId)) {
+            return $file;
+        }
+        $serverPackFileId = (string) $serverPackFileId;
+        if (! ctype_digit($serverPackFileId) || (int) $serverPackFileId <= 0) {
+            return $file;
+        }
+
+        $response = $this->get("/mods/$projectId/files/$serverPackFileId");
+        $serverPack = $response['data'] ?? null;
+
+        return is_array($serverPack) ? $serverPack : $file;
+    }
+
+    public function fileDownloadUrl(string $projectId, string $fileId): string
+    {
+        return $this->modFile($projectId, $fileId)['url'];
+    }
+
+    /** @return array{id: string, file_name: string, url: string, hashes: array<string, string>} */
+    public function modFile(string $projectId, string $fileId): array
+    {
+        $this->assertEnabled();
+        if (! ctype_digit($projectId) || ! ctype_digit($fileId)) {
             throw new MinecraftToolkitException('Die CurseForge-Datei-ID ist ungültig.');
         }
 
-        $download = $this->get("/mods/$projectId/files/$fileId/download-url");
-        if (!is_string($download['data'] ?? null) || trim($download['data']) === '') {
+        $response = $this->get("/mods/$projectId/files/$fileId");
+        $file = $response['data'] ?? null;
+        if (! is_array($file)) {
+            throw new MinecraftToolkitException('CurseForge liefert keine gültigen Dateiinformationen.');
+        }
+
+        $fileName = is_string($file['fileName'] ?? null) ? trim($file['fileName']) : '';
+        $downloadUrl = is_string($file['downloadUrl'] ?? null) ? trim($file['downloadUrl']) : '';
+        if ($downloadUrl === '') {
+            $download = $this->get("/mods/$projectId/files/$fileId/download-url");
+            $downloadUrl = is_string($download['data'] ?? null) ? trim($download['data']) : '';
+        }
+        if ($fileName === '' || $downloadUrl === '') {
             throw new MinecraftToolkitException('CurseForge liefert für eine Modpack-Datei keine Download-URL.');
         }
 
-        return $download['data'];
+        return [
+            'id' => (string) ($file['id'] ?? $fileId),
+            'file_name' => $fileName,
+            'url' => $downloadUrl,
+            'hashes' => $this->normalizeHashes($file['hashes'] ?? []),
+        ];
     }
 
     /** @return array{project: array<string, mixed>, version: array<string, mixed>, dependencies: array<int, array<string, mixed>>, warning: ?string} */
     public function installationCandidate(string $projectId, MinecraftToolkitSetup $setup): array
     {
         $this->assertEnabled();
-        if (!ctype_digit($projectId) || (int) $projectId <= 0) {
+        if (! ctype_digit($projectId) || (int) $projectId <= 0) {
             throw new MinecraftToolkitException('Die CurseForge-Projektkennung ist ungültig.');
         }
 
@@ -172,10 +249,10 @@ class CurseForgeService
         });
         $file = collect($files)
             ->where('releaseType', 1)
-            ->first(fn (mixed $candidate): bool => is_array($candidate) && !$this->isServerPack($candidate))
-            ?? collect($files)->first(fn (mixed $candidate): bool => is_array($candidate) && !$this->isServerPack($candidate));
-        if (!is_array($file)
-            || !is_string($file['fileName'] ?? null)
+            ->first(fn (mixed $candidate): bool => is_array($candidate) && ! $this->isServerPack($candidate))
+            ?? collect($files)->first(fn (mixed $candidate): bool => is_array($candidate) && ! $this->isServerPack($candidate));
+        if (! is_array($file)
+            || ! is_string($file['fileName'] ?? null)
             || strtolower(pathinfo($file['fileName'], PATHINFO_EXTENSION)) !== 'jar') {
             throw new MinecraftToolkitException('Keine kompatible CurseForge-JAR wurde gefunden.');
         }
@@ -248,7 +325,7 @@ class CurseForgeService
     }
 
     /** @param array<int, mixed> $projects
-     *  @return array<int, array<string, mixed>>
+     * @return array<int, array<string, mixed>>
      */
     public function normalizeSearchResults(array $projects): array
     {
@@ -286,13 +363,13 @@ class CurseForgeService
     }
 
     /** @param array<int, mixed> $hashes
-     *  @return array<string, string>
+     * @return array<string, string>
      */
     public function normalizeHashes(array $hashes): array
     {
         $normalized = [];
         foreach ($hashes as $hash) {
-            if (!is_array($hash) || !is_string($hash['value'] ?? null)) {
+            if (! is_array($hash) || ! is_string($hash['value'] ?? null)) {
                 continue;
             }
             if (($hash['algo'] ?? null) === 1) {
@@ -327,7 +404,7 @@ class CurseForgeService
         if ($loader !== null) {
             $params['modLoaderType'] = $loader;
         }
-        $key = 'minecrafttoolkit.curseforge.files.' . sha1(json_encode([
+        $key = 'minecrafttoolkit.curseforge.files.'.sha1(json_encode([
             $projectId,
             $params,
         ], JSON_THROW_ON_ERROR));
@@ -340,7 +417,7 @@ class CurseForgeService
     }
 
     /** @param array<string, mixed> $file
-     *  @return array<int, array<string, mixed>>
+     * @return array<int, array<string, mixed>>
      */
     private function dependencyDetails(array $file): array
     {
@@ -370,7 +447,7 @@ class CurseForgeService
     }
 
     /** @param array<string, mixed> $project
-     *  @return array<string, mixed>
+     * @return array<string, mixed>
      */
     private function normalizeProject(array $project): array
     {
@@ -398,7 +475,7 @@ class CurseForgeService
     }
 
     /** @param array<string, scalar> $query
-     *  @return array<string, mixed>
+     * @return array<string, mixed>
      */
     private function get(string $path, array $query = []): array
     {
@@ -407,7 +484,7 @@ class CurseForgeService
                 ? $this->proxyRequest($path, $query)
                 : $this->directRequest($path, $query);
 
-            if (!is_array($response)) {
+            if (! is_array($response)) {
                 throw new MinecraftToolkitException('CurseForge hat eine ungültige Antwort geliefert.');
             }
 
@@ -428,7 +505,7 @@ class CurseForgeService
     }
 
     /** @param array<string, scalar> $query
-     *  @return array<string, mixed>
+     * @return array<string, mixed>
      */
     private function proxyRequest(string $path, array $query = []): array
     {
@@ -444,11 +521,13 @@ class CurseForgeService
             ->json();
     }
 
-
     /** @return array<string, string> */
     private function proxyHeaders(string $path): array
     {
-        $secret = trim((string) config('minecrafttoolkit.curseforge_proxy_secret', ''));
+        $secret = trim((string) config('minecrafttoolkit.curseforge_proxy_secret', self::DEFAULT_PROXY_SECRET));
+        if ($secret === '') {
+            $secret = self::DEFAULT_PROXY_SECRET;
+        }
         $clientId = trim((string) config('minecrafttoolkit.curseforge_proxy_client_id', 'minecraft-toolkit'));
         $userAgent = (string) config('minecrafttoolkit.user_agent');
         $timestamp = (string) time();
@@ -473,7 +552,7 @@ class CurseForgeService
     }
 
     /** @param array<string, scalar> $query
-     *  @return array<string, mixed>
+     * @return array<string, mixed>
      */
     private function directRequest(string $path, array $query = []): array
     {
@@ -482,18 +561,18 @@ class CurseForgeService
             ->withUserAgent((string) config('minecrafttoolkit.user_agent'))
             ->connectTimeout(5)
             ->timeout((int) config('minecrafttoolkit.http_timeout', 20))
-            ->get(self::API . $path, $query)
+            ->get(self::API.$path, $query)
             ->throw()
             ->json();
     }
 
     private function assertEnabled(): void
     {
-        if (!(bool) config('minecrafttoolkit.curseforge_enabled', false)) {
+        if (! (bool) config('minecrafttoolkit.curseforge_enabled', false)) {
             throw new MinecraftToolkitException('CurseForge ist in den Plugin-Einstellungen deaktiviert.');
         }
 
-        if (!$this->usesProxy() && !$this->apiKeyProvider->hasKey()) {
+        if (! $this->usesProxy() && ! $this->apiKeyProvider->hasKey()) {
             throw new MinecraftToolkitException(
                 'CurseForge ist deaktiviert, weil weder ein Toolkit-Proxy noch ein lokaler CurseForge API-Key konfiguriert ist.'
             );
@@ -527,7 +606,6 @@ class CurseForgeService
         return $key;
     }
 
-
     private function usesProxy(): bool
     {
         return $this->proxyUrl() !== '';
@@ -535,7 +613,9 @@ class CurseForgeService
 
     private function proxyUrl(): string
     {
-        return rtrim(trim((string) config('minecrafttoolkit.curseforge_proxy_url', '')), '/');
+        $url = trim((string) config('minecrafttoolkit.curseforge_proxy_url', self::DEFAULT_PROXY_URL));
+
+        return rtrim($url !== '' ? $url : self::DEFAULT_PROXY_URL, '/');
     }
 
     /** @param array<string, mixed> $file */

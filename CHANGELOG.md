@@ -2,11 +2,49 @@
 
 All notable changes to Minecraft Toolkit are documented in this file.
 
-The changelog is maintained under the current release version. New changes are added to the latest version section until the project owner explicitly requests a version bump.
+Released versions are immutable. Every new change is documented under a new version section.
 
 This project is source-available, not open source. See [`LICENSE`](./LICENSE) for usage rights.
 
-## [1.3.5] - Unreleased
+## [1.3.6] - 2026-08-18
+
+### Added
+
+- Added verified atomic server-file writes for downloaded JAR/ZIP artifacts using same-directory temporary files, remote read-back verification, safe replacement backups, and failed-temporary-file cleanup.
+- Added scheduled metadata cache warming and update checks with manual approval for file-changing updates.
+- Added post-update startup verification, runtime failure detection, rollback recommendations, package health scoring, and Resource Usage Alerts crash correlation.
+- Added reusable private/shared package profiles with JSON import/export and setup-state transfer.
+- Added optional dependency selection and expanded package details, filters, aliases, notes, pinning, verification, disable/enable, reinstall, removal, and bulk actions.
+- Added public Modrinth/CurseForge modpack version selection and corrected `.mrpack`/CurseForge manifest dependency processing.
+- Added safe Paper, Purpur, and Folia conversion workflows with backups and conflict diagnostics.
+- Added Java and Bedrock access-list editors, world rename/info/backup/restore tools, datapack and resource-pack management, icon crop/resize, performance presets, MOTD preview, and Geyser/Floodgate diagnostics.
+- Added read-only managed-state API endpoints and a translated admin/source readiness checklist.
+- Added fake Wings storage, source fixtures, translation QA command, Larastan/PHPStan/Pint configuration, and CI quality checks.
+
+### Changed
+
+- Changed generated configuration writes and managed package operations to use validated backups or atomic writes where replacement safety is required.
+- Changed the updater to retain disabled managed packages in its inventory and allow safe reactivation.
+- Changed scheduled features to require a running Laravel queue worker and scheduler.
+- Changed the default JAR compatibility ceiling from Java 21/class version 65 to Java 25/class version 69 and exposed the ceiling in the plugin settings.
+
+### Fixed
+
+- Fixed a panel-wide HTTP 500 on Pelican `1.0.0-beta36` and newer by implementing the new plugin settings data contract while preserving compatibility with beta34 and beta35.
+- Fixed Modrinth modpack installation referencing manifest variables before the archive was parsed.
+- Fixed conditional Filament notifications calling `persistent()` with an unsupported Boolean argument.
+- Fixed newer Minecraft server JARs being rejected solely because the previous global default still targeted Java 21.
+- Fixed CurseForge disappearing from setup and installer source selection when the service was enabled and configured but a separate runtime permission check was evaluated while building the options.
+- Fixed empty legacy CurseForge proxy URL or secret environment entries overriding the built-in BlueIT defaults, which disabled CurseForge in Setup and Modpacks and showed `Proxy/API-Key fehlt` in Installer.
+- Fixed public and uploaded Modpacks being rejected by the JAR-only package filename validator; `.mrpack` and `.zip` archives now use explicit extension allowlists while retaining traversal and control-character protection.
+- Fixed CurseForge Modpack dependencies being written with synthetic numeric names such as `curseforge-238222-3043174.jar`; the real CurseForge file metadata and filename are now resolved before installation.
+- Fixed Modpack files being written before the database could accept the Modpack record; the inactive record is now validated first and activated transactionally only after all files were installed.
+- Changed public Modpack installations to run as unique one-hour queue jobs per server, preventing Livewire request timeouts and reporting completion or failure through Pelican's standard notification inbox.
+- Added an in-progress state for queued Modpack installations and automatic backup/removal of synthetic numeric CurseForge filenames left by older failed attempts once the correctly named file is installed.
+- Fixed CurseForge Modpacks using the client archive when a linked `serverPackFileId` exists; server packs are now preferred and safe server directories are extracted even when the archive has no CurseForge manifest.
+- Changed failed background Modpack notifications to include the concrete exception message instead of only a generic failure title.
+
+## [1.3.5] - 2026-07-22
 
 ### Added
 

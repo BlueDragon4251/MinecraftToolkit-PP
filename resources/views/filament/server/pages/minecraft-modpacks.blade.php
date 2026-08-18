@@ -14,6 +14,7 @@
 
         <div class="mt-6 space-y-3">
             @forelse ($results as $result)
+                @php($projectKey = ($result['source'] ?? ($data['source'] ?? 'modrinth')) . '_' . preg_replace('/[^A-Za-z0-9_-]/', '', $result['project_id']))
                 <div class="flex flex-col gap-3 rounded-xl border border-gray-200 p-4 dark:border-white/10 md:flex-row md:items-center md:justify-between">
                     <div class="flex gap-3">
                         @if (!empty($result['icon_url']))
@@ -38,9 +39,22 @@
                             @endif
                         </div>
                     </div>
-                    <x-filament::button size="sm" wire:click="installPublic('{{ $result['source'] ?? ($data['source'] ?? 'modrinth') }}', '{{ $result['project_id'] }}')" wire:loading.attr="disabled">
-                        {{ trans('minecrafttoolkit::strings.modpacks.install') }}
-                    </x-filament::button>
+                    <div class="flex min-w-64 flex-col gap-2">
+                        @if (isset($availableVersions[$projectKey]))
+                            <select wire:model="selectedVersions.{{ $projectKey }}" class="rounded-lg border-gray-300 bg-white text-sm dark:border-white/10 dark:bg-gray-900">
+                                @foreach ($availableVersions[$projectKey] as $version)
+                                    <option value="{{ $version['id'] }}">{{ $version['label'] }}</option>
+                                @endforeach
+                            </select>
+                        @else
+                            <x-filament::button size="sm" color="gray" wire:click="loadVersions('{{ $result['source'] ?? ($data['source'] ?? 'modrinth') }}', '{{ $result['project_id'] }}')" wire:loading.attr="disabled">
+                                {{ trans('minecrafttoolkit::strings.modpacks.choose_version') }}
+                            </x-filament::button>
+                        @endif
+                        <x-filament::button size="sm" wire:click="installPublic('{{ $result['source'] ?? ($data['source'] ?? 'modrinth') }}', '{{ $result['project_id'] }}')" wire:loading.attr="disabled">
+                            {{ trans('minecrafttoolkit::strings.modpacks.install') }}
+                        </x-filament::button>
+                    </div>
                 </div>
             @empty
                 <p class="text-sm text-gray-500">{{ trans('minecrafttoolkit::strings.modpacks.no_results') }}</p>
@@ -68,6 +82,8 @@
                             <span class="text-xs uppercase text-gray-500">{{ $modpack['source'] }}</span>
                             @if ($modpack['active'])
                                 <span class="text-xs text-success-600">{{ trans('minecrafttoolkit::strings.modpacks.active') }}</span>
+                            @elseif ($modpack['installing'])
+                                <span class="text-xs text-warning-600">{{ trans('minecrafttoolkit::strings.modpacks.installing') }}</span>
                             @endif
                         </div>
                         <div class="mt-1 text-sm text-gray-500">
@@ -77,7 +93,7 @@
                             @endif
                         </div>
                     </div>
-                    @if (!$modpack['active'])
+                    @if (!$modpack['active'] && !$modpack['installing'])
                         <x-filament::button size="sm" color="warning" wire:click="activate({{ $modpack['id'] }})" wire:loading.attr="disabled">
                             {{ trans('minecrafttoolkit::strings.modpacks.activate') }}
                         </x-filament::button>

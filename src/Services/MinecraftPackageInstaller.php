@@ -51,7 +51,7 @@ class MinecraftPackageInstaller
     ): MinecraftToolkitPackage {
         /** @var Lock $lock */
         $lock = Cache::lock("minecrafttoolkit.install.{$server->uuid}", 600);
-        if (!$lock->get()) {
+        if (! $lock->get()) {
             throw new MinecraftToolkitException('Für diesen Server läuft bereits eine Paketinstallation.');
         }
 
@@ -116,7 +116,7 @@ class MinecraftPackageInstaller
 
             foreach ($this->requiredDependencies($candidate['dependencies'] ?? []) as $dependency) {
                 $dependencyProjectId = $dependency['project_id'] ?? null;
-                if (!is_string($dependencyProjectId) || $dependencyProjectId === '') {
+                if (! is_string($dependencyProjectId) || $dependencyProjectId === '') {
                     throw new MinecraftToolkitException(
                         "Eine Pflicht-Abhängigkeit für $projectId konnte nicht eindeutig aufgelöst werden."
                     );
@@ -195,7 +195,6 @@ class MinecraftPackageInstaller
         }
     }
 
-
     private function assertDownloadedVersionMatchesCandidate(?string $downloadedVersion, string $expectedVersion): void
     {
         $downloadedVersion = trim((string) $downloadedVersion);
@@ -222,12 +221,12 @@ class MinecraftPackageInstaller
         return trim($version);
     }
 
-    /** @param mixed $dependencies
-     *  @return array<int, array<string, mixed>>
+    /**
+     * @return array<int, array<string, mixed>>
      */
     private function requiredDependencies(mixed $dependencies): array
     {
-        if (!is_array($dependencies)) {
+        if (! is_array($dependencies)) {
             return [];
         }
 
@@ -239,15 +238,24 @@ class MinecraftPackageInstaller
             ->all();
     }
 
-    public function safeFileName(string $fileName): string
+    /** @param string[] $allowedExtensions */
+    public function safeFileName(string $fileName, array $allowedExtensions = ['jar']): string
     {
-        if (str_contains($fileName, '..')
-            || str_contains($fileName, '/')
-            || str_contains($fileName, '\\')) {
-            throw new MinecraftToolkitException('Der Paketdateiname ist ungültig.');
-        }
+        $extension = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
+        $allowedExtensions = array_values(array_unique(array_map(
+            fn (string $allowedExtension): string => strtolower(ltrim(trim($allowedExtension), '.')),
+            $allowedExtensions
+        )));
 
-        if (!preg_match('/^[A-Za-z0-9][A-Za-z0-9._+() -]{0,199}\.jar$/i', $fileName)) {
+        if ($fileName === ''
+            || strlen($fileName) > 200
+            || str_starts_with($fileName, '.')
+            || preg_match('/[\x00-\x1F\x7F]/', $fileName) === 1
+            || str_contains($fileName, '..')
+            || str_contains($fileName, '/')
+            || str_contains($fileName, '\\')
+            || $extension === ''
+            || ! in_array($extension, $allowedExtensions, true)) {
             throw new MinecraftToolkitException('Der Paketdateiname ist ungültig.');
         }
 

@@ -82,7 +82,7 @@ class MinecraftSoftwareService
     /** @return array<string, string> */
     public function loaderVersionOptions(string $software, string $minecraftVersion): array
     {
-        if (!in_array($software, ['fabric', 'forge', 'neoforge'], true) || $minecraftVersion === '') {
+        if (! in_array($software, ['fabric', 'forge', 'neoforge'], true) || $minecraftVersion === '') {
             return [];
         }
 
@@ -119,7 +119,7 @@ class MinecraftSoftwareService
      */
     public function resolveInstallation(string $software, string $version, ?string $loaderVersion): array
     {
-        if (!in_array($software, ['fabric', 'forge', 'neoforge'], true)) {
+        if (! in_array($software, ['fabric', 'forge', 'neoforge'], true)) {
             $download = $this->resolveDownload($software, $version);
             if ($software === 'bedrock') {
                 return $download + [
@@ -137,7 +137,7 @@ class MinecraftSoftwareService
                 'sha256' => null,
             ];
         }
-        if (!is_string($loaderVersion) || !array_key_exists(
+        if (! is_string($loaderVersion) || ! array_key_exists(
             $loaderVersion,
             $this->loaderVersionOptions($software, $version)
         )) {
@@ -186,13 +186,13 @@ class MinecraftSoftwareService
                 'https://maven.minecraftforge.net/net/minecraftforge/forge/maven-metadata.xml'
             ), $this->forgePromotionVersions()),
             'neoforge' => collect(array_merge(
-                    $this->forgeMinecraftVersions($this->mavenVersions(
-                        'https://maven.neoforged.net/releases/net/neoforged/forge/maven-metadata.xml'
-                    )),
-                    $this->neoForgeMinecraftVersions($this->mavenVersions(
-                        'https://maven.neoforged.net/releases/net/neoforged/neoforge/maven-metadata.xml'
-                    ))
+                $this->forgeMinecraftVersions($this->mavenVersions(
+                    'https://maven.neoforged.net/releases/net/neoforged/forge/maven-metadata.xml'
+                )),
+                $this->neoForgeMinecraftVersions($this->mavenVersions(
+                    'https://maven.neoforged.net/releases/net/neoforged/neoforge/maven-metadata.xml'
                 ))
+            ))
                 ->unique()
                 ->sortDesc(SORT_NATURAL)
                 ->values()
@@ -235,13 +235,13 @@ class MinecraftSoftwareService
     private function resolveVanilla(string $version): array
     {
         $entry = collect($this->vanillaManifest()['versions'] ?? [])->firstWhere('id', $version);
-        if (!is_array($entry) || empty($entry['url'])) {
+        if (! is_array($entry) || empty($entry['url'])) {
             throw new MinecraftToolkitException("Vanilla $version wurde nicht gefunden.");
         }
 
         $metadata = $this->json((string) $entry['url']);
         $url = Arr::get($metadata, 'downloads.server.url');
-        if (!is_string($url)) {
+        if (! is_string($url)) {
             throw new MinecraftToolkitException("Für Vanilla $version ist kein Server-Download verfügbar.");
         }
 
@@ -255,7 +255,7 @@ class MinecraftSoftwareService
         $build = $this->selectPaperBuild($data);
         $url = is_array($build) ? Arr::get($build, 'downloads.server:default.url') : null;
 
-        if (!is_string($url)) {
+        if (! is_string($url)) {
             throw new MinecraftToolkitException("Für Paper $version wurde kein Build gefunden.");
         }
 
@@ -296,7 +296,7 @@ class MinecraftSoftwareService
         $build = $this->selectPaperBuild($data);
         $url = is_array($build) ? Arr::get($build, 'downloads.server:default.url') : null;
 
-        if (!is_string($url)) {
+        if (! is_string($url)) {
             throw new MinecraftToolkitException("Für Folia $version wurde kein Build gefunden.");
         }
 
@@ -312,7 +312,7 @@ class MinecraftSoftwareService
     {
         $data = $this->json("https://api.purpurmc.org/v2/purpur/$version");
         $latest = Arr::get($data, 'builds.latest');
-        if (!is_string($latest) && !is_int($latest)) {
+        if (! is_string($latest) && ! is_int($latest)) {
             throw new MinecraftToolkitException("Für Purpur $version wurde kein Build gefunden.");
         }
 
@@ -331,7 +331,7 @@ class MinecraftSoftwareService
         $installerVersion = is_array($stableInstaller)
             ? ($stableInstaller['version'] ?? null)
             : ($installers[0]['version'] ?? null);
-        if (!is_string($installerVersion)) {
+        if (! is_string($installerVersion)) {
             throw new MinecraftToolkitException('Für Fabric wurde keine Installer-Version gefunden.');
         }
 
@@ -385,7 +385,7 @@ class MinecraftSoftwareService
     }
 
     /** @param string[] $versions
-     *  @return string[]
+     * @return string[]
      */
     public function forgeMinecraftVersions(array $versions, array $promotionVersions = []): array
     {
@@ -418,7 +418,6 @@ class MinecraftSoftwareService
             return [];
         }
     }
-
 
     /** @return string[] */
     private function forgeLoaderVersions(string $minecraftVersion): array
@@ -454,7 +453,7 @@ class MinecraftSoftwareService
     {
         try {
             $promos = $this->json('https://files.minecraftforge.net/net/minecraftforge/forge/promotions_slim.json')['promos'] ?? [];
-            if (!is_array($promos)) {
+            if (! is_array($promos)) {
                 return [];
             }
 
@@ -475,14 +474,14 @@ class MinecraftSoftwareService
     }
 
     /** @param string[] $versions
-     *  @return string[]
+     * @return string[]
      */
     public function neoForgeMinecraftVersions(array $versions): array
     {
         return collect($versions)
             ->map(function (string $version): ?string {
                 $version = preg_replace('/-(?:beta|alpha|rc).*$/i', '', $version) ?? $version;
-                if (!preg_match('/^(\d+)\.(\d+)(?:\.(\d+))?/', $version, $match)) {
+                if (! preg_match('/^(\d+)\.(\d+)(?:\.(\d+))?/', $version, $match)) {
                     return null;
                 }
 
@@ -516,15 +515,15 @@ class MinecraftSoftwareService
     public function neoForgePrefixes(string $minecraftVersion): array
     {
         if (str_starts_with($minecraftVersion, '1.')) {
-            return [substr($minecraftVersion, 2) . '.'];
+            return [substr($minecraftVersion, 2).'.'];
         }
 
         $parts = explode('.', $minecraftVersion);
         if (count($parts) >= 3) {
-            return [$minecraftVersion . '.'];
+            return [$minecraftVersion.'.'];
         }
 
-        return [$minecraftVersion . '.'];
+        return [$minecraftVersion.'.'];
     }
 
     /** @return string[] */
@@ -575,7 +574,7 @@ class MinecraftSoftwareService
                 ->body();
 
             $normalized = str_replace('\/', '/', $html);
-            if (!preg_match('~https://www\.minecraft\.net/bedrockdedicatedserver/bin-linux/bedrock-server-([0-9.]+)\.zip~', $normalized, $match)) {
+            if (! preg_match('~https://www\.minecraft\.net/bedrockdedicatedserver/bin-linux/bedrock-server-([0-9.]+)\.zip~', $normalized, $match)) {
                 throw new MinecraftToolkitException('Der offizielle Bedrock-Linux-Download konnte nicht gefunden werden.');
             }
 
@@ -634,10 +633,10 @@ class MinecraftSoftwareService
         $checksum = trim(Http::withUserAgent((string) config('minecrafttoolkit.user_agent'))
             ->connectTimeout(5)
             ->timeout((int) config('minecrafttoolkit.http_timeout', 20))
-            ->get($url . '.sha256')
+            ->get($url.'.sha256')
             ->throw()
             ->body());
-        if (!preg_match('/^[a-f0-9]{64}$/i', $checksum)) {
+        if (! preg_match('/^[a-f0-9]{64}$/i', $checksum)) {
             throw new MinecraftToolkitException('Die SHA-256-Prüfsumme des Loader-Installers ist ungültig.');
         }
 
