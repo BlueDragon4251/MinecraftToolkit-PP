@@ -6,11 +6,11 @@ namespace BlueWolf\MinecraftToolkit\Filament\Server\Pages;
 
 use App\Models\Server;
 use BackedEnum;
+use BlueWolf\MinecraftToolkit\Exceptions\MinecraftToolkitException;
 use BlueWolf\MinecraftToolkit\Models\MinecraftToolkitLog;
 use BlueWolf\MinecraftToolkit\Models\MinecraftToolkitPackage;
 use BlueWolf\MinecraftToolkit\Models\MinecraftToolkitSetup;
 use BlueWolf\MinecraftToolkit\Services\CurseForgeService;
-use BlueWolf\MinecraftToolkit\Exceptions\MinecraftToolkitException;
 use BlueWolf\MinecraftToolkit\Services\MinecraftPermissionService;
 use BlueWolf\MinecraftToolkit\Services\MinecraftServerFileService;
 use BlueWolf\MinecraftToolkit\Services\MinecraftServerStateService;
@@ -70,17 +70,17 @@ class MinecraftOverviewPage extends Page
             [
                 'name' => 'Modrinth',
                 'enabled' => (bool) config('minecrafttoolkit.modrinth_enabled', true),
-                'detail' => (bool) config('minecrafttoolkit.modrinth_enabled', true) ? 'enabled' : 'disabled',
+                'detail' => (bool) config('minecrafttoolkit.modrinth_enabled', true) ? trans('minecrafttoolkit::strings.overview.enabled') : trans('minecrafttoolkit::strings.overview.disabled'),
             ],
             [
                 'name' => 'CurseForge',
                 'enabled' => app(CurseForgeService::class)->isConfigured(),
-                'detail' => app(CurseForgeService::class)->keySource() ?? 'not configured',
+                'detail' => app(CurseForgeService::class)->keySource() ?? trans('minecrafttoolkit::strings.overview.not_configured'),
             ],
             [
                 'name' => 'Crossplay',
                 'enabled' => (bool) config('minecrafttoolkit.crossplay_enabled', true),
-                'detail' => (bool) config('minecrafttoolkit.crossplay_enabled', true) ? 'enabled' : 'disabled',
+                'detail' => (bool) config('minecrafttoolkit.crossplay_enabled', true) ? trans('minecrafttoolkit::strings.overview.enabled') : trans('minecrafttoolkit::strings.overview.disabled'),
             ],
         ];
         $this->adminChecklist = $this->adminChecklist();
@@ -88,8 +88,8 @@ class MinecraftOverviewPage extends Page
 
     public static function canAccess(): bool
     {
-        if (!(bool) config('minecrafttoolkit.enabled', true)
-            || !Schema::hasTable('minecraft_toolkit_setups')) {
+        if (! (bool) config('minecrafttoolkit.enabled', true)
+            || ! Schema::hasTable('minecraft_toolkit_setups')) {
             return false;
         }
 
@@ -258,10 +258,10 @@ class MinecraftOverviewPage extends Page
             ],
             [
                 'label' => trans('minecrafttoolkit::strings.overview.check_curseforge'),
-                'ok' => !(bool) config('minecrafttoolkit.curseforge_enabled', true)
+                'ok' => ! (bool) config('minecrafttoolkit.curseforge_enabled', true)
                     || ((bool) config('minecrafttoolkit.curseforge_proxy_signed_requests', true)
                         && app(CurseForgeService::class)->isConfigured()),
-                'detail' => !(bool) config('minecrafttoolkit.curseforge_enabled', true)
+                'detail' => ! (bool) config('minecrafttoolkit.curseforge_enabled', true)
                     ? trans('minecrafttoolkit::strings.overview.check_disabled')
                     : (((bool) config('minecrafttoolkit.curseforge_proxy_signed_requests', true)
                         && app(CurseForgeService::class)->isConfigured())

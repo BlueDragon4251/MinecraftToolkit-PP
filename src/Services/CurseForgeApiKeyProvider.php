@@ -62,7 +62,7 @@ class CurseForgeApiKeyProvider
         try {
             $encoded = strrev(implode('', self::EMBEDDED_OBFUSCATED_API_KEY_PARTS));
             $decoded = base64_decode($encoded, true);
-            if (!is_string($decoded) || $decoded === '') {
+            if (! is_string($decoded) || $decoded === '') {
                 return null;
             }
 

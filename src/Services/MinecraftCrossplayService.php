@@ -32,7 +32,7 @@ class MinecraftCrossplayService
 
         foreach (['geyser', 'floodgate'] as $project) {
             $download = $this->downloads->latestSpigot($project);
-            $path = '/plugins/' . $download['file_name'];
+            $path = '/plugins/'.$download['file_name'];
             $this->files->backupIfPresent($server, $path);
             $this->files->downloadJar($server, $download['url'], $path, ['sha256' => $download['sha256']]);
 
@@ -51,7 +51,7 @@ class MinecraftCrossplayService
                     'package_type' => 'crossplay',
                     'loader' => $setup->software,
                     'minecraft_version' => $setup->minecraft_version,
-                    'version_number' => $download['version'] . '+' . $download['build'],
+                    'version_number' => $download['version'].'+'.$download['build'],
                     'file_name' => $download['file_name'],
                     'file_path' => $path,
                     'download_url' => $download['url'],
@@ -90,7 +90,7 @@ class MinecraftCrossplayService
         $this->riskGate->assertAllowed('crossplay_setup', $server);
         $this->assertSupported($setup);
         $this->state->assertOffline($server);
-        if (!$this->applyConfigIfPresent($server, $setup)) {
+        if (! $this->applyConfigIfPresent($server, $setup)) {
             throw new MinecraftToolkitException(
                 'Geysers config.yml existiert noch nicht. Starte den Server einmal und versuche es danach erneut.'
             );
@@ -115,7 +115,7 @@ class MinecraftCrossplayService
         $yaml = $this->patchYamlSectionValue($yaml, 'remote', 'auth-type', 'floodgate');
         $yaml = $this->forceAuthTypeFloodgate($yaml);
 
-        return rtrim($yaml) . "\n";
+        return rtrim($yaml)."\n";
     }
 
     public function resolveAllocation(Server $server, int $allocationId): Allocation
@@ -125,7 +125,7 @@ class MinecraftCrossplayService
             ->where('node_id', $server->node_id)
             ->first();
 
-        if (!$allocation instanceof Allocation) {
+        if (! $allocation instanceof Allocation) {
             throw new MinecraftToolkitException(
                 'Wähle eine zusätzliche Allocation für den Bedrock-UDP-Port.'
             );
@@ -142,7 +142,7 @@ class MinecraftCrossplayService
 
     private function applyConfigIfPresent(Server $server, MinecraftToolkitSetup $setup): bool
     {
-        if (!$setup->bedrock_allocation_port || !$this->files->exists($server, self::CONFIG_PATH)) {
+        if (! $setup->bedrock_allocation_port || ! $this->files->exists($server, self::CONFIG_PATH)) {
             return false;
         }
 
@@ -164,13 +164,14 @@ class MinecraftCrossplayService
 
         foreach ($lines as $index => $line) {
             if (preg_match('/^(\s*)auth-type\s*:\s*.*$/i', $line, $match)) {
-                $lines[$index] = ($match[1] ?? '') . 'auth-type: floodgate';
+                $lines[$index] = ($match[1] ?? '').'auth-type: floodgate';
                 $found = true;
             }
         }
 
-        if (!$found) {
+        if (! $found) {
             $yaml = $this->patchYamlSectionValue(implode("\n", $lines), 'remote', 'auth-type', 'floodgate');
+
             return $yaml;
         }
 
@@ -179,7 +180,7 @@ class MinecraftCrossplayService
 
     private function quoteYamlValue(string $value): string
     {
-        return '"' . str_replace(['\\', '"', "\r", "\n"], ['\\\\', '\\"', '', ' '], $value) . '"';
+        return '"'.str_replace(['\\', '"', "\r", "\n"], ['\\\\', '\\"', '', ' '], $value).'"';
     }
 
     private function patchYamlSectionValue(string $yaml, string $section, string $key, string $value): string
@@ -189,7 +190,7 @@ class MinecraftCrossplayService
         $sectionIndent = 0;
 
         foreach ($lines as $index => $line) {
-            if (preg_match('/^(\s*)' . preg_quote($section, '/') . ':\s*(?:#.*)?$/', $line, $match)) {
+            if (preg_match('/^(\s*)'.preg_quote($section, '/').':\s*(?:#.*)?$/', $line, $match)) {
                 $sectionIndex = $index;
                 $sectionIndent = strlen($match[1]);
                 break;
@@ -217,15 +218,15 @@ class MinecraftCrossplayService
                 break;
             }
 
-            if (preg_match('/^\s+' . preg_quote($key, '/') . ':\s*.*$/', $line)) {
-                $lines[$index] = str_repeat(' ', $sectionIndent + 2) . "$key: $value";
+            if (preg_match('/^\s+'.preg_quote($key, '/').':\s*.*$/', $line)) {
+                $lines[$index] = str_repeat(' ', $sectionIndent + 2)."$key: $value";
 
                 return implode("\n", $lines);
             }
         }
 
         array_splice($lines, $insertAt, 0, [
-            str_repeat(' ', $sectionIndent + 2) . "$key: $value",
+            str_repeat(' ', $sectionIndent + 2)."$key: $value",
         ]);
 
         return implode("\n", $lines);
@@ -233,8 +234,8 @@ class MinecraftCrossplayService
 
     private function assertSupported(MinecraftToolkitSetup $setup): void
     {
-        if (!(bool) config('minecrafttoolkit.crossplay_enabled', true)
-            || !in_array($setup->software, ['paper', 'purpur'], true)) {
+        if (! (bool) config('minecrafttoolkit.crossplay_enabled', true)
+            || ! in_array($setup->software, ['paper', 'purpur'], true)) {
             throw new MinecraftToolkitException('Crossplay wird nur für Paper und Purpur unterstützt.');
         }
     }

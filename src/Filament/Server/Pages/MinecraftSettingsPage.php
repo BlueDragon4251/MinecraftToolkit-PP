@@ -8,16 +8,16 @@ use App\Models\Server;
 use BackedEnum;
 use BlueWolf\MinecraftToolkit\Exceptions\MinecraftToolkitException;
 use BlueWolf\MinecraftToolkit\Models\MinecraftToolkitSetup;
-use BlueWolf\MinecraftToolkit\Services\MinecraftPermissionService;
 use BlueWolf\MinecraftToolkit\Services\MinecraftCrossplayService;
+use BlueWolf\MinecraftToolkit\Services\MinecraftPermissionService;
 use BlueWolf\MinecraftToolkit\Services\MinecraftPropertiesService;
 use BlueWolf\MinecraftToolkit\Services\MinecraftRiskGateService;
 use BlueWolf\MinecraftToolkit\Services\MinecraftServerFileService;
 use BlueWolf\MinecraftToolkit\Services\MinecraftServerStateService;
 use Filament\Facades\Filament;
-use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Notifications\Notification;
@@ -81,7 +81,7 @@ class MinecraftSettingsPage extends Page implements HasSchemas
 
     public static function canAccess(): bool
     {
-        if (!Schema::hasTable('minecraft_toolkit_setups')) {
+        if (! Schema::hasTable('minecraft_toolkit_setups')) {
             return false;
         }
 
@@ -150,7 +150,7 @@ class MinecraftSettingsPage extends Page implements HasSchemas
                         ->columnSpanFull()
                         ->helperText(trans('minecrafttoolkit::strings.settings_page.properties_raw_help')),
                 ]),
-            Section::make('Crossplay')
+            Section::make(trans('minecrafttoolkit::strings.settings_page.crossplay'))
                 ->description(trans('minecrafttoolkit::strings.settings_page.crossplay_desc'))
                 ->visible(fn (): bool => $this->supportsCrossplay())
                 ->schema([
@@ -160,7 +160,6 @@ class MinecraftSettingsPage extends Page implements HasSchemas
                 ]),
         ];
     }
-
 
     /** @return array<string, string> */
     private function propertyPageOptions(): array
@@ -178,7 +177,7 @@ class MinecraftSettingsPage extends Page implements HasSchemas
     {
         $fields = [];
         foreach ($this->knownPropertyDefinitions() as $definition) {
-            $name = 'properties.' . $this->propertyFormKey($definition['key']);
+            $name = 'properties.'.$this->propertyFormKey($definition['key']);
             $field = match ($definition['type']) {
                 'bool' => Toggle::make($name)->label($definition['label']),
                 'select' => Select::make($name)->label($definition['label'])->options($definition['options']),
@@ -193,7 +192,7 @@ class MinecraftSettingsPage extends Page implements HasSchemas
     }
 
     /** @param array<string, string> $parsed
-     *  @return array<string, mixed>
+     * @return array<string, mixed>
      */
     private function defaultsForKnownProperties(array $parsed): array
     {
@@ -210,12 +209,12 @@ class MinecraftSettingsPage extends Page implements HasSchemas
         return $defaults;
     }
 
-    /** @param mixed $properties
-     *  @return array<string, mixed>
+    /**
+     * @return array<string, mixed>
      */
     private function normalizeKnownPropertiesForSave(mixed $properties): array
     {
-        if (!is_array($properties)) {
+        if (! is_array($properties)) {
             return [];
         }
 
@@ -223,7 +222,7 @@ class MinecraftSettingsPage extends Page implements HasSchemas
         foreach ($this->knownPropertyDefinitions() as $definition) {
             $key = $definition['key'];
             $formKey = $this->propertyFormKey($key);
-            if (!array_key_exists($formKey, $properties)) {
+            if (! array_key_exists($formKey, $properties)) {
                 continue;
             }
 
@@ -238,12 +237,10 @@ class MinecraftSettingsPage extends Page implements HasSchemas
         return $changes;
     }
 
-
     private function propertyFormKey(string $propertyKey): string
     {
         return str_replace(['.', '-'], ['__dot__', '__dash__'], $propertyKey);
     }
-
 
     /** @return array<int, array<string, mixed>> */
     private function knownPropertyDefinitions(): array
@@ -375,14 +372,16 @@ class MinecraftSettingsPage extends Page implements HasSchemas
                 (int) ($data['bedrock_allocation_id'] ?? 0)
             );
 
-            Notification::make()
+            $notification = Notification::make()
                 ->title(trans('minecrafttoolkit::strings.settings_page.crossplay_installed'))
                 ->body($configured
                     ? trans('minecrafttoolkit::strings.settings_page.crossplay_configured_body')
                     : trans('minecrafttoolkit::strings.settings_page.crossplay_needs_first_start_body'))
-                ->success()
-                ->persistent(!$configured)
-                ->send();
+                ->success();
+            if (! $configured) {
+                $notification->persistent();
+            }
+            $notification->send();
         } catch (MinecraftToolkitException $exception) {
             $this->crossplayError($exception);
         }
@@ -441,8 +440,8 @@ class MinecraftSettingsPage extends Page implements HasSchemas
             ->mapWithKeys(fn ($allocation): array => [$allocation->id => $allocation->address])
             ->all();
 
-        if (!(bool) config('minecrafttoolkit.bedrock_port_required', true) && $server->allocation) {
-            return [$server->allocation->id => $server->allocation->address . ' (geteilt)'] + $allocations;
+        if (! (bool) config('minecrafttoolkit.bedrock_port_required', true) && $server->allocation) {
+            return [$server->allocation->id => $server->allocation->address.' (geteilt)'] + $allocations;
         }
 
         return $allocations;
@@ -450,7 +449,7 @@ class MinecraftSettingsPage extends Page implements HasSchemas
 
     private function currentBedrockAllocationId(Server $server, MinecraftToolkitSetup $setup): ?int
     {
-        if (!$setup->bedrock_allocation_port) {
+        if (! $setup->bedrock_allocation_port) {
             return null;
         }
 

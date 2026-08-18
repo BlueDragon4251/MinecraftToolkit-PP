@@ -7,15 +7,14 @@ namespace BlueWolf\MinecraftToolkit\Filament\Server\Pages;
 use App\Models\Server;
 use BackedEnum;
 use BlueWolf\MinecraftToolkit\Exceptions\MinecraftToolkitException;
-use BlueWolf\MinecraftToolkit\Filament\Server\Pages\MinecraftOverviewPage;
 use BlueWolf\MinecraftToolkit\Models\MinecraftToolkitSetup;
+use BlueWolf\MinecraftToolkit\Services\CurseForgeService;
 use BlueWolf\MinecraftToolkit\Services\MinecraftModpackService;
 use BlueWolf\MinecraftToolkit\Services\MinecraftPermissionService;
 use BlueWolf\MinecraftToolkit\Services\MinecraftRiskGateService;
 use BlueWolf\MinecraftToolkit\Services\MinecraftSetupService;
 use BlueWolf\MinecraftToolkit\Services\MinecraftSoftwareService;
 use BlueWolf\MinecraftToolkit\Services\ModrinthService;
-use BlueWolf\MinecraftToolkit\Services\CurseForgeService;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Hidden;
@@ -31,7 +30,6 @@ use Filament\Schemas\Components\Group;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
-use Illuminate\Support\Facades\Blade;
 use Filament\Schemas\Components\Wizard;
 use Filament\Schemas\Components\Wizard\Step;
 use Filament\Schemas\Contracts\HasSchemas;
@@ -80,24 +78,24 @@ class MinecraftSetupPage extends Page implements HasSchemas
 
     public static function canAccess(): bool
     {
-        if (!(bool) config('minecrafttoolkit.enabled', true)
+        if (! (bool) config('minecrafttoolkit.enabled', true)
             || collect([
                 'minecraft_toolkit_setups',
                 'minecraft_toolkit_packages',
                 'minecraft_toolkit_update_checks',
                 'minecraft_toolkit_logs',
-            ])->contains(fn (string $table): bool => !Schema::hasTable($table))) {
+            ])->contains(fn (string $table): bool => ! Schema::hasTable($table))) {
             return false;
         }
 
         $server = Filament::getTenant();
         $user = user();
-        if (!$server instanceof Server || $user === null
-            || !app(MinecraftPermissionService::class)->canModify($user, $server)) {
+        if (! $server instanceof Server || $user === null
+            || ! app(MinecraftPermissionService::class)->canModify($user, $server)) {
             return false;
         }
 
-        return !MinecraftToolkitSetup::query()
+        return ! MinecraftToolkitSetup::query()
             ->where('server_uuid', $server->uuid)
             ->where('setup_status', 'completed')
             ->exists();
@@ -208,6 +206,7 @@ class MinecraftSetupPage extends Page implements HasSchemas
                                 TextInput::make('motd')
                                     ->label('MOTD')
                                     ->required()
+                                    ->live(debounce: 300)
                                     ->maxLength(255)
                                     ->helperText(trans('minecrafttoolkit::strings.setup.motd_help')),
                                 Section::make(trans('minecrafttoolkit::strings.setup.motd_formatter'))
@@ -381,7 +380,7 @@ class MinecraftSetupPage extends Page implements HasSchemas
 
                                 return trans('minecrafttoolkit::strings.setup.ready_desc', [
                                     'software' => app(MinecraftSoftwareService::class)->supportedSoftware()[$software] ?? 'Minecraft',
-                                    'version' => trim(($get('minecraft_version') ?: '') . ' ' . ($get('loader_version') ?: '')),
+                                    'version' => trim(($get('minecraft_version') ?: '').' '.($get('loader_version') ?: '')),
                                     'artifact' => $artifact,
                                     'port' => Filament::getTenant()?->allocation?->port ?? trans('minecrafttoolkit::strings.common.missing'),
                                 ]);
@@ -514,7 +513,7 @@ class MinecraftSetupPage extends Page implements HasSchemas
     private function applySetupTemplate(?string $templateKey, Set $set): void
     {
         $template = config("minecrafttoolkit.setup_templates.$templateKey");
-        if (!is_array($template)) {
+        if (! is_array($template)) {
             return;
         }
 
@@ -558,7 +557,7 @@ class MinecraftSetupPage extends Page implements HasSchemas
     {
         return collect(config('minecrafttoolkit.package_profiles', []))
             ->filter(function (mixed $profile) use ($software): bool {
-                if (!is_array($profile) || !is_string($profile['label'] ?? null)) {
+                if (! is_array($profile) || ! is_string($profile['label'] ?? null)) {
                     return false;
                 }
 
@@ -575,7 +574,7 @@ class MinecraftSetupPage extends Page implements HasSchemas
     private function applyPackageProfile(?string $profileKey): void
     {
         $profile = config("minecrafttoolkit.package_profiles.$profileKey");
-        if (!is_array($profile) || !is_array($profile['packages'] ?? null)) {
+        if (! is_array($profile) || ! is_array($profile['packages'] ?? null)) {
             return;
         }
 
@@ -620,7 +619,7 @@ class MinecraftSetupPage extends Page implements HasSchemas
             return null;
         }
 
-        $motd = '§' . ((string) ($get('motd_formatter_color') ?: 'f'));
+        $motd = '§'.((string) ($get('motd_formatter_color') ?: 'f'));
         if ((bool) $get('motd_formatter_bold')) {
             $motd .= '§l';
         }
@@ -631,7 +630,7 @@ class MinecraftSetupPage extends Page implements HasSchemas
             $motd .= '§n';
         }
 
-        $set('motd', $motd . $text . '§r');
+        $set('motd', $motd.$text.'§r');
 
         return null;
     }
@@ -643,9 +642,7 @@ class MinecraftSetupPage extends Page implements HasSchemas
         if ((bool) config('minecrafttoolkit.modrinth_enabled', true)) {
             $options['modrinth'] = 'Modrinth';
         }
-        if ((bool) config('minecrafttoolkit.curseforge_enabled', false)
-            && app(CurseForgeService::class)->isConfigured()
-            && app(MinecraftRiskGateService::class)->isAllowed('curseforge_usage', $this->server())) {
+        if (app(CurseForgeService::class)->isConfigured()) {
             $options['curseforge'] = 'CurseForge';
         }
 
@@ -670,12 +667,12 @@ class MinecraftSetupPage extends Page implements HasSchemas
         $software = (string) $get('software');
         $minecraftVersion = (string) $get('minecraft_version');
         if ($software === '' || $minecraftVersion === ''
-            || !in_array($software, ['paper', 'purpur', 'folia', 'fabric', 'forge', 'neoforge'], true)) {
+            || ! in_array($software, ['paper', 'purpur', 'folia', 'fabric', 'forge', 'neoforge'], true)) {
             return [];
         }
 
         $source = (string) ($get('setup_package_source') ?: 'modrinth');
-        if ($source === 'curseforge' && !app(CurseForgeService::class)->isConfigured()) {
+        if ($source === 'curseforge' && ! app(CurseForgeService::class)->isConfigured()) {
             return [];
         }
 
@@ -706,18 +703,16 @@ class MinecraftSetupPage extends Page implements HasSchemas
 
         return collect($results)
             ->mapWithKeys(fn (array $result): array => [
-                $source . ':' . $result['project_id'] => $result['title']
-                    . (isset($result['downloads']) ? ' · ' . number_format((int) $result['downloads']) . ' Downloads' : ''),
+                $source.':'.$result['project_id'] => $result['title']
+                    .(isset($result['downloads']) ? ' · '.number_format((int) $result['downloads']).' Downloads' : ''),
             ])
             ->all();
     }
 
-
-
     private function renderSetupPackageBrowser(Get $get): string
     {
-        if (!$this->canShowSetupPackageBrowser($get)) {
-            return '<p class="text-sm text-gray-500">' . e(trans('minecrafttoolkit::strings.setup.package_browser_waiting')) . '</p>';
+        if (! $this->canShowSetupPackageBrowser($get)) {
+            return '<p class="text-sm text-gray-500">'.e(trans('minecrafttoolkit::strings.setup.package_browser_waiting')).'</p>';
         }
 
         $this->data['software'] = (string) ($get('software') ?? $this->data['software'] ?? '');
@@ -731,7 +726,6 @@ class MinecraftSetupPage extends Page implements HasSchemas
             'page' => $this,
         ])->render();
     }
-
 
     public function resetSetupPackageBrowser(): void
     {
@@ -800,6 +794,46 @@ class MinecraftSetupPage extends Page implements HasSchemas
         return in_array($sourceProjectId, $this->selectedSetupPackageIds, true);
     }
 
+    public function motdPreviewHtml(): string
+    {
+        $motd = str_replace('§', '&', (string) ($this->data['motd'] ?? 'A Minecraft Server'));
+        $colors = ['0' => '#000000', '1' => '#0000aa', '2' => '#00aa00', '3' => '#00aaaa', '4' => '#aa0000', '5' => '#aa00aa', '6' => '#ffaa00', '7' => '#aaaaaa', '8' => '#555555', '9' => '#5555ff', 'a' => '#55ff55', 'b' => '#55ffff', 'c' => '#ff5555', 'd' => '#ff55ff', 'e' => '#ffff55', 'f' => '#ffffff'];
+        $style = ['color' => '#ffffff', 'font-weight' => 'normal', 'font-style' => 'normal', 'text-decoration' => 'none'];
+        $html = '';
+        $buffer = '';
+        $flush = function () use (&$html, &$buffer, &$style): void {
+            if ($buffer === '') {
+                return;
+            } $html .= '<span style="color:'.$style['color'].';font-weight:'.$style['font-weight'].';font-style:'.$style['font-style'].';text-decoration:'.$style['text-decoration'].'">'.nl2br(e($buffer)).'</span>';
+            $buffer = '';
+        };
+        for ($index = 0, $length = strlen($motd); $index < $length; $index++) {
+            if (($motd[$index] === '§' || $motd[$index] === '&') && isset($motd[$index + 1])) {
+                $code = strtolower($motd[++$index]);
+                $flush();
+                if (isset($colors[$code])) {
+                    $style = ['color' => $colors[$code], 'font-weight' => 'normal', 'font-style' => 'normal', 'text-decoration' => 'none'];
+                } elseif ($code === 'l') {
+                    $style['font-weight'] = 'bold';
+                } elseif ($code === 'o') {
+                    $style['font-style'] = 'italic';
+                } elseif ($code === 'n') {
+                    $style['text-decoration'] = 'underline';
+                } elseif ($code === 'm') {
+                    $style['text-decoration'] = 'line-through';
+                } elseif ($code === 'r') {
+                    $style = ['color' => '#ffffff', 'font-weight' => 'normal', 'font-style' => 'normal', 'text-decoration' => 'none'];
+                }
+
+                continue;
+            }
+            $buffer .= $motd[$index];
+        }
+        $flush();
+
+        return $html;
+    }
+
     private function server(): Server
     {
         /** @var Server $server */
@@ -808,8 +842,8 @@ class MinecraftSetupPage extends Page implements HasSchemas
         return $server;
     }
 
-    /** @param mixed $statePackageIds
-     *  @return array<int, string>
+    /**
+     * @return array<int, string>
      */
     private function normalizedSelectedSetupPackageIds(mixed $statePackageIds): array
     {
@@ -827,9 +861,10 @@ class MinecraftSetupPage extends Page implements HasSchemas
             $software = (string) ($this->data['software'] ?? '');
             $minecraftVersion = (string) ($this->data['minecraft_version'] ?? '');
             if ($software === '' || $minecraftVersion === ''
-                || !in_array($software, ['paper', 'purpur', 'folia', 'fabric', 'forge', 'neoforge'], true)) {
+                || ! in_array($software, ['paper', 'purpur', 'folia', 'fabric', 'forge', 'neoforge'], true)) {
                 $this->setupPackageResults = [];
                 $this->setupPackageResultsTitle = trans('minecrafttoolkit::strings.setup.package_browser_waiting');
+
                 return;
             }
 
@@ -837,9 +872,10 @@ class MinecraftSetupPage extends Page implements HasSchemas
             if ($source === 'curseforge') {
                 app(MinecraftRiskGateService::class)->assertAllowed('curseforge_usage', $this->server());
             }
-            if ($source === 'curseforge' && !app(CurseForgeService::class)->isConfigured()) {
+            if ($source === 'curseforge' && ! app(CurseForgeService::class)->isConfigured()) {
                 $this->setupPackageResults = [];
                 $this->setupPackageResultsTitle = trans('minecrafttoolkit::strings.installer.missing_proxy');
+
                 return;
             }
 
@@ -856,7 +892,7 @@ class MinecraftSetupPage extends Page implements HasSchemas
 
             $this->setupPackageResultsTitle = ($popular || $query === '')
                 ? trans('minecrafttoolkit::strings.installer.featured')
-                : 'Search: “' . $query . '”';
+                : 'Search: “'.$query.'”';
 
             $this->setupPackageResults = match ($source) {
                 'modrinth' => ($popular || $query === '')
@@ -880,7 +916,7 @@ class MinecraftSetupPage extends Page implements HasSchemas
     private function bedrockAllocationOptions(): array
     {
         $server = Filament::getTenant();
-        if (!$server instanceof Server) {
+        if (! $server instanceof Server) {
             return [];
         }
 
@@ -893,8 +929,8 @@ class MinecraftSetupPage extends Page implements HasSchemas
             ])
             ->all();
 
-        if (!(bool) config('minecrafttoolkit.bedrock_port_required', true) && $server->allocation) {
-            return [$server->allocation->id => $server->allocation->address . ' (geteilt)'] + $allocations;
+        if (! (bool) config('minecrafttoolkit.bedrock_port_required', true) && $server->allocation) {
+            return [$server->allocation->id => $server->allocation->address.' (geteilt)'] + $allocations;
         }
 
         return $allocations;

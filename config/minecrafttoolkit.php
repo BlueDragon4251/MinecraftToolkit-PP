@@ -7,6 +7,14 @@ $boolean = static fn (mixed $value, bool $default): bool => filter_var(
     FILTER_VALIDATE_BOOLEAN,
     FILTER_NULL_ON_FAILURE
 ) ?? $default;
+$string = static function (mixed $value, string $default): string {
+    $value = trim((string) $value);
+
+    return $value !== '' ? $value : $default;
+};
+
+$defaultCurseForgeProxyUrl = 'https://blueit42.vercel.app'.'/api'.'/curseforge'.'/proxy';
+$defaultCurseForgeProxySecret = 'blueit42-minecraft-toolkit-proxy-v1';
 
 return [
     'enabled' => $boolean(env('MINECRAFT_TOOLKIT_ENABLED', true), true),
@@ -16,8 +24,8 @@ return [
     'curseforge_enabled' => $boolean(env('MINECRAFT_TOOLKIT_CURSEFORGE_ENABLED', true), true),
     // Default public flow uses the BlueIT service so the real CurseForge API key stays outside the plugin source.
     // Private/self-hosted installs may override the service URL, shared secret, or use a direct local API key in .env.
-    'curseforge_proxy_url' => rtrim((string) env('MINECRAFT_TOOLKIT_CURSEFORGE_PROXY_URL', 'https://blueit42.vercel.app' . '/api' . '/curseforge' . '/proxy'), '/'),
-    'curseforge_proxy_secret' => env('MINECRAFT_TOOLKIT_CURSEFORGE_PROXY_SECRET', 'blueit42-minecraft-toolkit-proxy-v1'),
+    'curseforge_proxy_url' => rtrim($string(env('MINECRAFT_TOOLKIT_CURSEFORGE_PROXY_URL', $defaultCurseForgeProxyUrl), $defaultCurseForgeProxyUrl), '/'),
+    'curseforge_proxy_secret' => $string(env('MINECRAFT_TOOLKIT_CURSEFORGE_PROXY_SECRET', $defaultCurseForgeProxySecret), $defaultCurseForgeProxySecret),
     'curseforge_proxy_client_id' => env('MINECRAFT_TOOLKIT_CURSEFORGE_PROXY_CLIENT_ID', 'minecraft-toolkit'),
     'curseforge_proxy_signed_requests' => $boolean(env('MINECRAFT_TOOLKIT_CURSEFORGE_PROXY_SIGNED_REQUESTS', true), true),
     // Optional local direct API key override for private/self-hosted installs only.
@@ -39,15 +47,18 @@ return [
     'http_timeout' => max(5, (int) env('MINECRAFT_TOOLKIT_HTTP_TIMEOUT', 20)),
     'download_timeout' => max(30, (int) env('MINECRAFT_TOOLKIT_DOWNLOAD_TIMEOUT', 300)),
     'compatibility_cache_minutes' => max(0, (int) env('MINECRAFT_TOOLKIT_COMPATIBILITY_CACHE_MINUTES', 30)),
+    'scheduled_update_checks' => $boolean(env('MINECRAFT_TOOLKIT_SCHEDULED_UPDATE_CHECKS', true), true),
+    'post_update_health_check' => $boolean(env('MINECRAFT_TOOLKIT_POST_UPDATE_HEALTH_CHECK', false), false),
+    'post_update_health_wait_seconds' => max(15, min(300, (int) env('MINECRAFT_TOOLKIT_POST_UPDATE_HEALTH_WAIT', 60))),
     'block_private_download_ips' => $boolean(env('MINECRAFT_TOOLKIT_BLOCK_PRIVATE_DOWNLOAD_IPS', true), true),
     'hash_required' => $boolean(env('MINECRAFT_TOOLKIT_HASH_REQUIRED', false), false),
-    // Java 21 supports class file version 65. Set to 0 to disable this safety check.
-    'java_class_version_max' => (int) env('MINECRAFT_TOOLKIT_JAVA_CLASS_VERSION_MAX', 65),
+    // Java 25 supports class file version 69. Set to 0 to disable this safety check.
+    'java_class_version_max' => (int) env('MINECRAFT_TOOLKIT_JAVA_CLASS_VERSION_MAX', 69),
     'max_icon_bytes' => max(65536, (int) env('MINECRAFT_TOOLKIT_MAX_ICON_BYTES', 2097152)),
     'max_package_bytes' => max(1048576, (int) env('MINECRAFT_TOOLKIT_MAX_PACKAGE_BYTES', 104857600)),
     'max_jar_entries' => max(100, (int) env('MINECRAFT_TOOLKIT_MAX_JAR_ENTRIES', 20000)),
     'max_jar_entry_bytes' => max(1048576, (int) env('MINECRAFT_TOOLKIT_MAX_JAR_ENTRY_BYTES', 52428800)),
-    'user_agent' => env('MINECRAFT_TOOLKIT_USER_AGENT', 'BlueIT-MinecraftToolkit/1.3.5'),
+    'user_agent' => env('MINECRAFT_TOOLKIT_USER_AGENT', 'BlueIT-MinecraftToolkit/1.3.6-dev'),
     'blueit_announcements_enabled' => $boolean(env('MINECRAFT_TOOLKIT_BLUEIT_ANNOUNCEMENTS_ENABLED', true), true),
     'blueit_announcements_url' => rtrim((string) env('MINECRAFT_TOOLKIT_BLUEIT_ANNOUNCEMENTS_URL', 'https://blueit42.vercel.app/api/announcements'), '/'),
     'blueit_announcements_secret' => env('MINECRAFT_TOOLKIT_BLUEIT_ANNOUNCEMENTS_SECRET', 'blueit42-announcements-v1'),

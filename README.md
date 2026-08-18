@@ -6,7 +6,7 @@ Minecraft Toolkit is a Pelican Panel plugin for setting up and managing Minecraf
 
 See [`CHANGELOG.md`](./CHANGELOG.md) for version history and notable changes.
 
-Current version: `1.3.5`.
+Current version: `1.3.6`.
 
 ## License and usage rights
 
@@ -56,7 +56,14 @@ All server files are accessed through Pelican's Wings API. The plugin does not r
 - Permission to edit server files
 - Permission to change the startup command when installing Fabric, Forge, NeoForge, or Vanilla Bedrock
 
-No queue worker or scheduler is required. Update checks run only when a user starts them from the Minecraft Updater page.
+A queue worker and Laravel scheduler are required for scheduled metadata warming, automatic update checks, and post-update health verification. Manual setup, installs, updates, and checks remain usable without scheduled execution.
+
+Recommended production processes:
+
+```bash
+php artisan queue:work --tries=3
+* * * * * cd /var/www/pelican && php artisan schedule:run >> /dev/null 2>&1
+```
 
 ## Installation through Plugin Upload
 
@@ -272,6 +279,7 @@ Administrators can configure Minecraft Toolkit from the Pelican plugin settings 
 | `MINECRAFT_TOOLKIT_BEDROCK_FALLBACK_VERSIONS` | `latest` | Fallback Bedrock setup versions shown when live lookup fails. Use comma-separated explicit versions for direct version URLs. |
 | `MINECRAFT_TOOLKIT_HTTP_TIMEOUT` | `20` | Metadata API timeout in seconds |
 | `MINECRAFT_TOOLKIT_DOWNLOAD_TIMEOUT` | `300` | Package download timeout in seconds |
+| `MINECRAFT_TOOLKIT_JAVA_CLASS_VERSION_MAX` | `69` | Highest accepted Java class-file version (Java 25). Set this to the runtime supported by the server image or `0` to disable the check. |
 | `MINECRAFT_TOOLKIT_COMPATIBILITY_CACHE_MINUTES` | `30` | Cache duration for repeated version-change compatibility checks. Set to `0` to disable |
 | `MINECRAFT_TOOLKIT_BLOCK_PRIVATE_DOWNLOAD_IPS` | `true` | Blocks downloads that resolve to private, loopback, link-local, or reserved addresses |
 | `MINECRAFT_TOOLKIT_HASH_REQUIRED` | `false` | Requires SHA-256 or SHA-512 for package downloads when enabled |
@@ -384,7 +392,7 @@ Update checks now avoid trusting stale `logs/latest.log` entries after a package
 
 ## Java compatibility safety check
 
-Minecraft Toolkit checks downloaded plugin/mod JARs before writing them to the server. Public builds default to Java 21 compatibility with `MINECRAFT_TOOLKIT_JAVA_CLASS_VERSION_MAX=65`. If a package requires a newer Java runtime, installation is aborted instead of leaving a broken JAR in `/plugins` or `/mods`. Private installations can set this value to their actual runtime class-file limit or `0` to disable the check.
+Minecraft Toolkit checks downloaded server, plugin, and mod JARs before writing them to the server. Public builds default to Java 25 compatibility with `MINECRAFT_TOOLKIT_JAVA_CLASS_VERSION_MAX=69`. If a package requires a newer Java runtime, installation is aborted instead of leaving a broken JAR on the server. Administrators should set this value to the actual runtime class-file limit of their server image or use `0` to disable the check.
 
 ## Crossplay configuration note
 

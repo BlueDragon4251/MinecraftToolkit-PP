@@ -19,7 +19,7 @@ class MinecraftPermissionService
 
     public function canModify(User $user, Server $server): bool
     {
-        if ((bool) config('minecrafttoolkit.admins_only', false) && !$user->isRootAdmin()) {
+        if ((bool) config('minecrafttoolkit.admins_only', false) && ! $user->isRootAdmin()) {
             return false;
         }
 

@@ -9,11 +9,11 @@ use BackedEnum;
 use BlueWolf\MinecraftToolkit\Exceptions\MinecraftToolkitException;
 use BlueWolf\MinecraftToolkit\Models\MinecraftToolkitPackage;
 use BlueWolf\MinecraftToolkit\Models\MinecraftToolkitSetup;
+use BlueWolf\MinecraftToolkit\Services\CurseForgeService;
 use BlueWolf\MinecraftToolkit\Services\MinecraftPackageInstaller;
 use BlueWolf\MinecraftToolkit\Services\MinecraftPermissionService;
 use BlueWolf\MinecraftToolkit\Services\MinecraftRiskGateService;
 use BlueWolf\MinecraftToolkit\Services\ModrinthService;
-use BlueWolf\MinecraftToolkit\Services\CurseForgeService;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -51,6 +51,9 @@ class MinecraftInstallerPage extends Page implements HasSchemas
     /** @var array<string, mixed>|null */
     public ?array $candidate = null;
 
+    /** @var string[] */
+    public array $optionalDependencyIds = [];
+
     /** @var array<int, array<string, mixed>> */
     public array $installedPackages = [];
 
@@ -76,18 +79,18 @@ class MinecraftInstallerPage extends Page implements HasSchemas
 
     public static function canAccess(): bool
     {
-        if (!(bool) config('minecrafttoolkit.enabled', true)
-            || !static::hasEnabledSource()
-            || !Schema::hasTable('minecraft_toolkit_setups')
-            || !Schema::hasTable('minecraft_toolkit_packages')) {
+        if (! (bool) config('minecrafttoolkit.enabled', true)
+            || ! static::hasEnabledSource()
+            || ! Schema::hasTable('minecraft_toolkit_setups')
+            || ! Schema::hasTable('minecraft_toolkit_packages')) {
             return false;
         }
 
         $server = Filament::getTenant();
         $user = user();
-        if (!$server instanceof Server
+        if (! $server instanceof Server
             || $user === null
-            || !app(MinecraftPermissionService::class)->canModify($user, $server)) {
+            || ! app(MinecraftPermissionService::class)->canModify($user, $server)) {
             return false;
         }
 
@@ -128,7 +131,7 @@ class MinecraftInstallerPage extends Page implements HasSchemas
                         ->label(trans('minecrafttoolkit::strings.setup.source'))
                         ->options($this->sourceOptions())
                         ->disableOptionWhen(fn (string $value): bool => $value === 'curseforge'
-                            && !$this->curseForgeConfigured())
+                            && ! $this->curseForgeConfigured())
                         ->live()
                         ->afterStateUpdated(function (Set $set): void {
                             $set('query', '');
@@ -214,8 +217,8 @@ class MinecraftInstallerPage extends Page implements HasSchemas
             $offset = $this->resultPage * 20;
             $popular = $forcePopular || $query === '';
             $this->resultsTitle = $popular
-                ? trans('minecrafttoolkit::strings.installer.featured') . ' - ' . $this->packageLabel(true)
-                : 'Search: “' . $query . '”';
+                ? trans('minecrafttoolkit::strings.installer.featured').' - '.$this->packageLabel(true)
+                : 'Search: “'.$query.'”';
 
             $this->results = $this->filterResults(match ($source) {
                 'modrinth' => $popular
@@ -268,6 +271,7 @@ class MinecraftInstallerPage extends Page implements HasSchemas
                 })
                 ->all();
             $this->candidate = $candidate;
+            $this->optionalDependencyIds = [];
         } catch (MinecraftToolkitException $exception) {
             $this->candidate = null;
             $this->notifyError(trans('minecrafttoolkit::strings.installer.check_failed', ['package' => $this->packageLabel()]), $exception);
@@ -277,12 +281,13 @@ class MinecraftInstallerPage extends Page implements HasSchemas
     public function clearSelection(): void
     {
         $this->candidate = null;
+        $this->optionalDependencyIds = [];
     }
 
     public function installSelected(): void
     {
         $projectId = $this->candidate['project']['project_id'] ?? null;
-        if (!is_string($projectId)) {
+        if (! is_string($projectId)) {
             $this->notifyError(
                 trans('minecrafttoolkit::strings.installer.invalid_selection'),
                 new MinecraftToolkitException(trans('minecrafttoolkit::strings.installer.invalid_selection_body'))
@@ -293,6 +298,17 @@ class MinecraftInstallerPage extends Page implements HasSchemas
 
         try {
             $source = (string) ($this->candidate['source'] ?? $this->selectedSource());
+            $availableOptional = collect($this->candidate['dependencies'] ?? [])
+                ->filter(fn (array $dependency): bool => in_array((string) ($dependency['type'] ?? ''), ['optional', 'recommended', 'embedded'], true)
+                    && ! ($dependency['installed'] ?? false) && is_string($dependency['project_id'] ?? null))
+                ->pluck('project_id')->map(fn (mixed $id): string => (string) $id)->all();
+            foreach (array_values(array_intersect($this->optionalDependencyIds, $availableOptional)) as $dependencyId) {
+                match ($source) {
+                    'modrinth' => app(MinecraftPackageInstaller::class)->installModrinthPackage($this->server(), $this->setup(), $dependencyId),
+                    'curseforge' => app(MinecraftPackageInstaller::class)->installCurseForgePackage($this->server(), $this->setup(), $dependencyId),
+                    default => throw new MinecraftToolkitException(trans('minecrafttoolkit::strings.installer.invalid_source')),
+                };
+            }
             $package = match ($source) {
                 'modrinth' => app(MinecraftPackageInstaller::class)
                     ->installModrinthPackage($this->server(), $this->setup(), $projectId),
@@ -308,6 +324,7 @@ class MinecraftInstallerPage extends Page implements HasSchemas
                 ->send();
 
             $this->candidate = null;
+            $this->optionalDependencyIds = [];
             $this->refreshInstalledPackages();
         } catch (MinecraftToolkitException $exception) {
             $this->notifyError(trans('minecrafttoolkit::strings.installer.install_failed', ['package' => $this->packageLabel()]), $exception);
@@ -315,8 +332,8 @@ class MinecraftInstallerPage extends Page implements HasSchemas
     }
 
     /**
-     * @param array<int, array<string, mixed>> $results
-     * @param array<string, mixed> $state
+     * @param  array<int, array<string, mixed>>  $results
+     * @param  array<string, mixed>  $state
      * @return array<int, array<string, mixed>>
      */
     private function filterResults(array $results, array $state): array
@@ -334,12 +351,12 @@ class MinecraftInstallerPage extends Page implements HasSchemas
                         fn (mixed $value): string => mb_strtolower((string) $value),
                         is_array($result['categories'] ?? null) ? $result['categories'] : []
                     );
-                    if (!collect($categories)->contains(fn (string $value): bool => str_contains($value, $category))) {
+                    if (! collect($categories)->contains(fn (string $value): bool => str_contains($value, $category))) {
                         return false;
                     }
                 }
 
-                if ($author !== '' && !str_contains(mb_strtolower((string) ($result['author'] ?? '')), $author)) {
+                if ($author !== '' && ! str_contains(mb_strtolower((string) ($result['author'] ?? '')), $author)) {
                     return false;
                 }
 
@@ -436,8 +453,7 @@ class MinecraftInstallerPage extends Page implements HasSchemas
 
     public function curseForgeConfigured(): bool
     {
-        return app(CurseForgeService::class)->isConfigured()
-            && app(MinecraftRiskGateService::class)->isAllowed('curseforge_usage', $this->server());
+        return app(CurseForgeService::class)->isConfigured();
     }
 
     public function hasUsableSource(): bool
@@ -450,7 +466,7 @@ class MinecraftInstallerPage extends Page implements HasSchemas
     {
         return collect($this->sourceOptions())
             ->reject(fn (string $label, string $source): bool => $source === 'curseforge'
-                && !$this->curseForgeConfigured())
+                && ! $this->curseForgeConfigured())
             ->all();
     }
 
@@ -459,7 +475,7 @@ class MinecraftInstallerPage extends Page implements HasSchemas
         return (string) ($this->data['source'] ?? array_key_first($this->sourceOptions()) ?? '');
     }
 
-    private static function hasEnabledSource(): bool
+    public static function hasEnabledSource(): bool
     {
         return (bool) config('minecrafttoolkit.modrinth_enabled', true)
             || (bool) config('minecrafttoolkit.curseforge_enabled', false);

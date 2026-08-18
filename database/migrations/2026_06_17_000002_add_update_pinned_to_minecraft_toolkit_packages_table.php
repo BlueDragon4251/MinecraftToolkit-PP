@@ -10,7 +10,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        if (!Schema::hasTable('minecraft_toolkit_packages')
+        if (! Schema::hasTable('minecraft_toolkit_packages')
             || Schema::hasColumn('minecraft_toolkit_packages', 'update_pinned')) {
             return;
         }
@@ -22,8 +22,8 @@ return new class extends Migration
 
     public function down(): void
     {
-        if (!Schema::hasTable('minecraft_toolkit_packages')
-            || !Schema::hasColumn('minecraft_toolkit_packages', 'update_pinned')) {
+        if (! Schema::hasTable('minecraft_toolkit_packages')
+            || ! Schema::hasColumn('minecraft_toolkit_packages', 'update_pinned')) {
             return;
         }
 

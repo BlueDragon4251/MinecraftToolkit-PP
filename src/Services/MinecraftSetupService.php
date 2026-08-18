@@ -31,7 +31,7 @@ class MinecraftSetupService
     {
         /** @var Lock $lock */
         $lock = Cache::lock("minecrafttoolkit.setup.{$server->uuid}", 600);
-        if (!$lock->get()) {
+        if (! $lock->get()) {
             throw new MinecraftToolkitException('Für diesen Server läuft bereits ein Minecraft-Setup.');
         }
 
@@ -45,7 +45,7 @@ class MinecraftSetupService
     /** @param array<string, mixed> $data */
     private function performSetup(Server $server, array $data, mixed $icon): MinecraftToolkitSetup
     {
-        if (!$server->allocation) {
+        if (! $server->allocation) {
             throw new MinecraftToolkitException(
                 'Dieser Server hat keine primäre Allocation. Ohne Server-Port kann Minecraft Toolkit keine Konfiguration erzeugen.'
             );
@@ -78,7 +78,7 @@ class MinecraftSetupService
                 $this->files->backupIfPresent($server, '/server-icon.png');
                 $this->files->backupIfPresent($server, '/bedrock-server.zip');
                 if ($download['file_name'] !== 'server.jar' && $download['file_name'] !== 'bedrock-server.zip') {
-                    $this->files->backupIfPresent($server, '/' . $download['file_name']);
+                    $this->files->backupIfPresent($server, '/'.$download['file_name']);
                 }
             }
 
@@ -94,7 +94,7 @@ class MinecraftSetupService
                     $this->files->downloadJar(
                         $server,
                         $download['url'],
-                        '/' . $download['file_name'],
+                        '/'.$download['file_name'],
                         ['sha256' => $download['sha256']]
                     );
                 } else {
@@ -110,7 +110,7 @@ class MinecraftSetupService
 
             $iconInstalled = $isBedrock ? false : $this->writeIcon($server, $icon);
             $crossplayConfigured = null;
-            if (!$isBedrock && (bool) ($data['crossplay_enabled'] ?? false)) {
+            if (! $isBedrock && (bool) ($data['crossplay_enabled'] ?? false)) {
                 $allocationId = (int) ($data['bedrock_allocation_id'] ?? 0);
                 $crossplayConfigured = $this->crossplay->install($server, $setup, $allocationId);
             }
@@ -119,7 +119,7 @@ class MinecraftSetupService
             }
 
             $setup->forceFill([
-                'server_jar_path' => (!$download['installer'] && !$isBedrock) ? '/' . $download['file_name'] : null,
+                'server_jar_path' => (! $download['installer'] && ! $isBedrock) ? '/'.$download['file_name'] : null,
                 'server_binary_path' => $isBedrock ? '/bedrock_server' : ($download['installer'] ? '/run.sh' : null),
                 'icon_path' => $iconInstalled ? '/server-icon.png' : null,
                 'setup_status' => 'completed',
@@ -143,7 +143,7 @@ class MinecraftSetupService
                     'minecraft_version' => (string) $data['minecraft_version'],
                     'version_number' => $download['version_id'],
                     'file_name' => $download['file_name'],
-                    'file_path' => '/' . $download['file_name'],
+                    'file_path' => '/'.$download['file_name'],
                     'download_url' => $download['url'],
                     'dependencies_json' => is_string($download['sha256'])
                         ? ['sha256' => $download['sha256']]
@@ -159,7 +159,7 @@ class MinecraftSetupService
             $setupPackageFailures = $this->installSelectedSetupPackages($server, $setup->refresh(), $data['setup_package_ids'] ?? []);
             if ($setupPackageFailures !== []) {
                 $setup->forceFill([
-                    'last_error' => 'Einige ausgewählte Pakete konnten nach dem Setup nicht installiert werden: ' . implode('; ', $setupPackageFailures),
+                    'last_error' => 'Einige ausgewählte Pakete konnten nach dem Setup nicht installiert werden: '.implode('; ', $setupPackageFailures),
                 ])->save();
             }
 
@@ -237,18 +237,18 @@ class MinecraftSetupService
         ];
     }
 
-    /** @param mixed $selectedPackages
-     *  @return string[]
+    /**
+     * @return string[]
      */
     private function installSelectedSetupPackages(Server $server, MinecraftToolkitSetup $setup, mixed $selectedPackages): array
     {
-        if (!is_array($selectedPackages) || $selectedPackages === []) {
+        if (! is_array($selectedPackages) || $selectedPackages === []) {
             return [];
         }
 
         $failures = [];
         foreach (array_values(array_unique(array_filter($selectedPackages, 'is_string'))) as $selectedPackage) {
-            if (!str_contains($selectedPackage, ':')) {
+            if (! str_contains($selectedPackage, ':')) {
                 continue;
             }
 
@@ -260,7 +260,7 @@ class MinecraftSetupService
                     default => throw new MinecraftToolkitException('Ungültige Paketquelle.'),
                 };
             } catch (\Throwable $exception) {
-                $failures[] = "$source:$projectId - " . ($exception instanceof MinecraftToolkitException
+                $failures[] = "$source:$projectId - ".($exception instanceof MinecraftToolkitException
                     ? $exception->getMessage()
                     : 'Technischer Fehler');
                 $this->log($server, 'setup_package_install_failed', 'warning', end($failures) ?: 'Paketinstallation fehlgeschlagen.', [
@@ -280,7 +280,7 @@ class MinecraftSetupService
         }
 
         $contents = method_exists($icon, 'getContent') ? $icon->getContent() : null;
-        if (!is_string($contents) || $contents === '') {
+        if (! is_string($contents) || $contents === '') {
             throw new MinecraftToolkitException('Das Server-Icon konnte nicht gelesen werden.');
         }
         if (strlen($contents) > (int) config('minecrafttoolkit.max_icon_bytes', 2097152)) {
@@ -291,8 +291,8 @@ class MinecraftSetupService
         $dimensions = strlen($contents) >= 24
             ? unpack('Nwidth/Nheight', substr($contents, 16, 8))
             : false;
-        if (!str_starts_with($contents, $pngSignature)
-            || !is_array($dimensions)
+        if (! str_starts_with($contents, $pngSignature)
+            || ! is_array($dimensions)
             || $dimensions['width'] !== 64
             || $dimensions['height'] !== 64) {
             throw new MinecraftToolkitException('Das Server-Icon muss eine 64x64 Pixel große PNG-Datei sein.');
@@ -312,9 +312,9 @@ class MinecraftSetupService
         $this->riskGate->assertAllowed('startup_edits', $server);
 
         $user = user();
-        if ($user === null || (!$user->isRootAdmin()
+        if ($user === null || (! $user->isRootAdmin()
             && $server->owner_id !== $user->id
-            && !$user->can(SubuserPermission::StartupUpdate, $server))) {
+            && ! $user->can(SubuserPermission::StartupUpdate, $server))) {
             throw new MinecraftToolkitException(
                 'Für Modloader-Setups wird zusätzlich die Berechtigung zum Ändern des Startbefehls benötigt.'
             );

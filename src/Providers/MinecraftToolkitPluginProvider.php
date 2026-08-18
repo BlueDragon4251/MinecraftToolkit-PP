@@ -4,31 +4,41 @@ declare(strict_types=1);
 
 namespace BlueWolf\MinecraftToolkit\Providers;
 
-use BlueWolf\MinecraftToolkit\Services\MinecraftPropertiesService;
-use BlueWolf\MinecraftToolkit\Services\MinecraftPermissionService;
-use BlueWolf\MinecraftToolkit\Services\MinecraftPackageInstaller;
-use BlueWolf\MinecraftToolkit\Services\MinecraftCrossplayService;
+use App\Models\Subuser;
+use BlueWolf\MinecraftToolkit\Console\Commands\CheckMinecraftToolkitTranslationsCommand;
+use BlueWolf\MinecraftToolkit\Console\Commands\WarmMinecraftToolkitCacheCommand;
+use BlueWolf\MinecraftToolkit\Jobs\CheckMinecraftToolkitUpdatesJob;
+use BlueWolf\MinecraftToolkit\Jobs\StartMinecraftPostUpdateVerificationJob;
+use BlueWolf\MinecraftToolkit\Livewire\BlueItAnnouncements;
+use BlueWolf\MinecraftToolkit\Models\MinecraftToolkitPackage;
+use BlueWolf\MinecraftToolkit\Services\BlueItAnnouncementService;
+use BlueWolf\MinecraftToolkit\Services\CurseForgeApiKeyProvider;
+use BlueWolf\MinecraftToolkit\Services\CurseForgeService;
 use BlueWolf\MinecraftToolkit\Services\GeyserDownloadService;
-use BlueWolf\MinecraftToolkit\Services\ModrinthService;
+use BlueWolf\MinecraftToolkit\Services\MinecraftCompatibilityService;
+use BlueWolf\MinecraftToolkit\Services\MinecraftConflictService;
+use BlueWolf\MinecraftToolkit\Services\MinecraftConversionService;
+use BlueWolf\MinecraftToolkit\Services\MinecraftCrossplayService;
+use BlueWolf\MinecraftToolkit\Services\MinecraftManagementService;
+use BlueWolf\MinecraftToolkit\Services\MinecraftModpackService;
+use BlueWolf\MinecraftToolkit\Services\MinecraftPackageInstaller;
+use BlueWolf\MinecraftToolkit\Services\MinecraftPermissionService;
+use BlueWolf\MinecraftToolkit\Services\MinecraftProfileService;
+use BlueWolf\MinecraftToolkit\Services\MinecraftPropertiesService;
 use BlueWolf\MinecraftToolkit\Services\MinecraftServerFileService;
 use BlueWolf\MinecraftToolkit\Services\MinecraftServerStateService;
 use BlueWolf\MinecraftToolkit\Services\MinecraftSetupService;
 use BlueWolf\MinecraftToolkit\Services\MinecraftSoftwareService;
 use BlueWolf\MinecraftToolkit\Services\MinecraftUpdateService;
-use BlueWolf\MinecraftToolkit\Services\MinecraftCompatibilityService;
 use BlueWolf\MinecraftToolkit\Services\MinecraftVersionChangeService;
-use BlueWolf\MinecraftToolkit\Services\MinecraftModpackService;
-use BlueWolf\MinecraftToolkit\Services\BlueItAnnouncementService;
-use BlueWolf\MinecraftToolkit\Livewire\BlueItAnnouncements;
-use BlueWolf\MinecraftToolkit\Services\CurseForgeApiKeyProvider;
-use BlueWolf\MinecraftToolkit\Services\CurseForgeService;
-use App\Models\Subuser;
+use BlueWolf\MinecraftToolkit\Services\ModrinthService;
 use Filament\Facades\Filament;
 use Filament\Support\Facades\FilamentView;
 use Filament\View\PanelsRenderHook;
-use Illuminate\Support\ServiceProvider;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Lang;
+use Illuminate\Support\ServiceProvider;
 use Livewire\Livewire;
 
 class MinecraftToolkitPluginProvider extends ServiceProvider
@@ -48,6 +58,10 @@ class MinecraftToolkitPluginProvider extends ServiceProvider
         $this->app->singleton(MinecraftCompatibilityService::class);
         $this->app->singleton(MinecraftVersionChangeService::class);
         $this->app->singleton(MinecraftModpackService::class);
+        $this->app->singleton(MinecraftManagementService::class);
+        $this->app->singleton(MinecraftProfileService::class);
+        $this->app->singleton(MinecraftConversionService::class);
+        $this->app->singleton(MinecraftConflictService::class);
         $this->app->singleton(MinecraftServerFileService::class);
         $this->app->singleton(MinecraftServerStateService::class);
         $this->app->singleton(MinecraftSetupService::class);
@@ -63,6 +77,10 @@ class MinecraftToolkitPluginProvider extends ServiceProvider
 
     public function boot(): void
     {
+        $this->loadRoutesFrom(plugin_path('minecrafttoolkit', 'routes/api.php'));
+        if ($this->app->runningInConsole()) {
+            $this->commands([WarmMinecraftToolkitCacheCommand::class, CheckMinecraftToolkitTranslationsCommand::class]);
+        }
         $this->loadTranslationsFrom(plugin_path('minecrafttoolkit', 'lang'), 'minecrafttoolkit');
         $this->loadViewsFrom(plugin_path('minecrafttoolkit', 'resources/views'), 'minecrafttoolkit');
         $this->loadPluginTranslationsForCurrentLocale();
@@ -76,15 +94,28 @@ class MinecraftToolkitPluginProvider extends ServiceProvider
                 ['panelId' => Filament::getCurrentPanel()?->getId() ?? 'app']
             )
         );
+
+        MinecraftToolkitPackage::updated(function (MinecraftToolkitPackage $package): void {
+            if ((bool) config('minecrafttoolkit.post_update_health_check', false) && $package->wasChanged('source_version_id') && $package->setup?->server_id) {
+                StartMinecraftPostUpdateVerificationJob::dispatch((int) $package->setup->server_id, $package->id);
+            }
+        });
+
+        $this->app->afterResolving(Schedule::class, function (Schedule $schedule): void {
+            if ((bool) config('minecrafttoolkit.scheduled_update_checks', true)) {
+                $schedule->job(new CheckMinecraftToolkitUpdatesJob)->dailyAt('04:00')->name('minecraft-toolkit:update-checks')->withoutOverlapping();
+                $schedule->command('minecraft-toolkit:warm-cache')->dailyAt('03:30')->name('minecraft-toolkit:warm-cache')->withoutOverlapping();
+            }
+        });
     }
 
     private function loadPluginTranslationsForCurrentLocale(): void
     {
         $locale = (string) app()->getLocale();
         $targetLocale = str_starts_with(strtolower($locale), 'de') ? 'de' : 'en';
-        $basePath = plugin_path('minecrafttoolkit', 'lang/' . $targetLocale);
+        $basePath = plugin_path('minecrafttoolkit', 'lang/'.$targetLocale);
 
-        foreach (glob($basePath . '/*.php') ?: [] as $file) {
+        foreach (glob($basePath.'/*.php') ?: [] as $file) {
             $group = basename($file, '.php');
             $lines = require $file;
             if (is_array($lines)) {
@@ -99,9 +130,10 @@ class MinecraftToolkitPluginProvider extends ServiceProvider
         $flattened = [];
 
         foreach ($lines as $key => $value) {
-            $fullKey = $prefix . '.' . $key;
+            $fullKey = $prefix.'.'.$key;
             if (is_array($value)) {
                 $flattened += $this->flattenTranslations($value, $fullKey);
+
                 continue;
             }
 

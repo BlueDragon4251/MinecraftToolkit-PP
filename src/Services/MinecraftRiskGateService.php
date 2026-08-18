@@ -40,12 +40,13 @@ class MinecraftRiskGateService
             return;
         }
 
-        if (!(bool) config("minecrafttoolkit.$configKey", false)) {
+        if (! (bool) config("minecrafttoolkit.$configKey", false)) {
             return;
         }
 
         if ($user?->isRootAdmin()) {
             $this->audit($server, $action, 'allowed', 'Risk-Gate durch Root-Admin passiert.');
+
             return;
         }
 
@@ -61,7 +62,7 @@ class MinecraftRiskGateService
     {
         $user ??= user();
         $configKey = self::ADMIN_ONLY_CONFIG[$action] ?? null;
-        if ($configKey === null || !(bool) config("minecrafttoolkit.$configKey", false)) {
+        if ($configKey === null || ! (bool) config("minecrafttoolkit.$configKey", false)) {
             return true;
         }
 
@@ -70,7 +71,7 @@ class MinecraftRiskGateService
 
     public function audit(Server $server, string $action, string $result, string $message, array $context = []): void
     {
-        if (!(bool) config('minecrafttoolkit.security_audit_log_enabled', true)) {
+        if (! (bool) config('minecrafttoolkit.security_audit_log_enabled', true)) {
             return;
         }
 
@@ -78,7 +79,7 @@ class MinecraftRiskGateService
             MinecraftToolkitLog::query()->create([
                 'server_uuid' => $server->uuid,
                 'user_id' => user()?->id,
-                'action' => 'security_' . $action,
+                'action' => 'security_'.$action,
                 'level' => $result === 'denied' ? 'warning' : 'info',
                 'message' => $message,
                 'context_json' => ['result' => $result] + $context,

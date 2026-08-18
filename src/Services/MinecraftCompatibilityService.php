@@ -8,6 +8,7 @@ use App\Models\Server;
 use BlueWolf\MinecraftToolkit\Exceptions\MinecraftToolkitException;
 use BlueWolf\MinecraftToolkit\Models\MinecraftToolkitPackage;
 use BlueWolf\MinecraftToolkit\Models\MinecraftToolkitSetup;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Cache;
 
 class MinecraftCompatibilityService
@@ -61,12 +62,12 @@ class MinecraftCompatibilityService
         string $minecraftVersion,
         ?string $loaderVersion
     ): void {
-        if (!array_key_exists($minecraftVersion, $this->software->versionOptions($setup->software))) {
+        if (! array_key_exists($minecraftVersion, $this->software->versionOptions($setup->software))) {
             throw new MinecraftToolkitException('Die gewählte Minecraft-Version ist nicht verfügbar.');
         }
         if (in_array($setup->software, ['fabric', 'forge', 'neoforge'], true)
-            && (!is_string($loaderVersion)
-                || !array_key_exists(
+            && (! is_string($loaderVersion)
+                || ! array_key_exists(
                     $loaderVersion,
                     $this->software->loaderVersionOptions($setup->software, $minecraftVersion)
                 ))) {
@@ -74,7 +75,7 @@ class MinecraftCompatibilityService
         }
     }
 
-    /** @return \Illuminate\Database\Eloquent\Collection<int, MinecraftToolkitPackage> */
+    /** @return Collection<int, MinecraftToolkitPackage> */
     private function compatiblePackages(Server $server)
     {
         return MinecraftToolkitPackage::query()
@@ -86,7 +87,7 @@ class MinecraftCompatibilityService
     }
 
     /**
-     * @param \Illuminate\Database\Eloquent\Collection<int, MinecraftToolkitPackage> $packageRecords
+     * @param  Collection<int, MinecraftToolkitPackage>  $packageRecords
      * @return array{
      *   target: array<string, mixed>,
      *   packages: array<int, array<string, mixed>>,
@@ -114,7 +115,7 @@ class MinecraftCompatibilityService
         ];
     }
 
-    /** @param \Illuminate\Database\Eloquent\Collection<int, MinecraftToolkitPackage> $packages */
+    /** @param Collection<int, MinecraftToolkitPackage> $packages */
     private function cacheKey(Server $server, MinecraftToolkitSetup $target, $packages): string
     {
         $fingerprint = $packages
@@ -132,8 +133,8 @@ class MinecraftCompatibilityService
             ->all();
 
         return 'minecrafttoolkit.compatibility.'
-            . $server->uuid . '.'
-            . sha1(json_encode([
+            .$server->uuid.'.'
+            .sha1(json_encode([
                 'software' => $target->software,
                 'minecraft_version' => $target->minecraft_version,
                 'loader' => $target->loader,
@@ -179,7 +180,7 @@ class MinecraftCompatibilityService
                     : $this->curseForge->updateCandidate($package->source_project_id, $target);
                 $version = $candidate['version'];
                 $sameVersion = (string) $version['id'] === (string) $package->source_version_id;
-                if (!$sameVersion && $package->update_pinned) {
+                if (! $sameVersion && $package->update_pinned) {
                     return $base + [
                         'status' => 'pinned',
                         'target_version' => (string) ($version['version_number'] ?? $version['name'] ?? $version['id']),
@@ -215,7 +216,7 @@ class MinecraftCompatibilityService
                     'status' => $sameBuild
                         ? 'compatible'
                         : ($package->update_pinned ? 'pinned' : 'system_update'),
-                    'target_version' => $download['version'] . '+' . $download['build'],
+                    'target_version' => $download['version'].'+'.$download['build'],
                     'message' => 'Das Crossplay-Systempaket wird für den Zielserver beibehalten.',
                 ];
             } catch (MinecraftToolkitException $exception) {

@@ -7,6 +7,7 @@ namespace BlueWolf\MinecraftToolkit\Filament\Server\Pages;
 use App\Models\Server;
 use BackedEnum;
 use BlueWolf\MinecraftToolkit\Exceptions\MinecraftToolkitException;
+use BlueWolf\MinecraftToolkit\Jobs\InstallMinecraftModpackJob;
 use BlueWolf\MinecraftToolkit\Models\MinecraftToolkitModpack;
 use BlueWolf\MinecraftToolkit\Models\MinecraftToolkitSetup;
 use BlueWolf\MinecraftToolkit\Services\CurseForgeService;
@@ -51,17 +52,23 @@ class MinecraftModpacksPage extends Page implements HasSchemas
 
     public int $page = 0;
 
+    /** @var array<string, array<int, array{id: string, label: string}>> */
+    public array $availableVersions = [];
+
+    /** @var array<string, string> */
+    public array $selectedVersions = [];
+
     public static function canAccess(): bool
     {
-        if (!(bool) config('minecrafttoolkit.enabled', true)
-            || !Schema::hasTable('minecraft_toolkit_modpacks')) {
+        if (! (bool) config('minecrafttoolkit.enabled', true)
+            || ! Schema::hasTable('minecraft_toolkit_modpacks')) {
             return false;
         }
 
         $server = Filament::getTenant();
         $user = user();
-        if (!$server instanceof Server || $user === null
-            || !app(MinecraftPermissionService::class)->canModify($user, $server)) {
+        if (! $server instanceof Server || $user === null
+            || ! app(MinecraftPermissionService::class)->canModify($user, $server)) {
             return false;
         }
 
@@ -156,20 +163,43 @@ class MinecraftModpacksPage extends Page implements HasSchemas
     {
         try {
             $state = $this->form->getState();
-            app(MinecraftModpackService::class)->installPublic(
-                $this->server(),
-                $this->setup(),
+            $server = $this->server();
+            $setup = $this->setup();
+            InstallMinecraftModpackJob::dispatch(
+                $server->id,
+                $setup->id,
                 $source,
                 $projectId,
-                (string) ($state['mode'] ?? 'combine')
+                (string) ($state['mode'] ?? 'combine'),
+                $this->selectedVersions[$this->projectKey($source, $projectId)] ?? null,
+                user()?->id
             );
-            $this->refreshModpacks();
-            Notification::make()->title(trans('minecrafttoolkit::strings.modpacks.installed'))->success()->send();
+            Notification::make()
+                ->title(trans('minecrafttoolkit::strings.modpacks.install_queued'))
+                ->body(trans('minecrafttoolkit::strings.modpacks.install_queued_help'))
+                ->success()
+                ->send();
         } catch (MinecraftToolkitException $exception) {
             $this->notifyError($exception->getMessage());
         } catch (\Throwable $exception) {
             report($exception);
             $this->notifyError(trans('minecrafttoolkit::strings.modpacks.install_failed'));
+        }
+    }
+
+    public function loadVersions(string $source, string $projectId): void
+    {
+        try {
+            $key = $this->projectKey($source, $projectId);
+            $this->availableVersions[$key] = app(MinecraftModpackService::class)->versions($source, $projectId);
+            if (! isset($this->selectedVersions[$key]) && isset($this->availableVersions[$key][0]['id'])) {
+                $this->selectedVersions[$key] = $this->availableVersions[$key][0]['id'];
+            }
+        } catch (MinecraftToolkitException $exception) {
+            $this->notifyError($exception->getMessage());
+        } catch (\Throwable $exception) {
+            report($exception);
+            $this->notifyError(trans('minecrafttoolkit::strings.modpacks.versions_failed'));
         }
     }
 
@@ -237,6 +267,7 @@ class MinecraftModpacksPage extends Page implements HasSchemas
                 'version' => $modpack->version_number,
                 'file_name' => $modpack->file_name,
                 'active' => (bool) $modpack->active,
+                'installing' => $modpack->installed_at === null,
                 'installed_at' => $modpack->installed_at?->diffForHumans(),
             ])
             ->all();
@@ -281,6 +312,11 @@ class MinecraftModpacksPage extends Page implements HasSchemas
             ->danger()
             ->persistent()
             ->send();
+    }
+
+    private function projectKey(string $source, string $projectId): string
+    {
+        return $source.'_'.(preg_replace('/[^A-Za-z0-9_-]/', '', $projectId) ?? '');
     }
 
     private function localizedErrorBody(string $message): string

@@ -23,7 +23,7 @@ class ModrinthService
         }
 
         $facets = $this->searchFacets($setup);
-        $key = 'minecrafttoolkit.modrinth.search.' . sha1(json_encode([$query, $facets, $limit], JSON_THROW_ON_ERROR));
+        $key = 'minecrafttoolkit.modrinth.search.'.sha1(json_encode([$query, $facets, $limit], JSON_THROW_ON_ERROR));
         $data = Cache::remember($key, now()->addMinutes(10), fn (): array => $this->get('/search', [
             'query' => $query,
             'facets' => json_encode($facets, JSON_THROW_ON_ERROR),
@@ -45,14 +45,14 @@ class ModrinthService
     {
         $this->assertEnabled();
 
-        if (!in_array($setup->software, ['paper', 'purpur', 'folia', 'fabric', 'forge', 'neoforge'], true)) {
+        if (! in_array($setup->software, ['paper', 'purpur', 'folia', 'fabric', 'forge', 'neoforge'], true)) {
             return [];
         }
 
         $facets = $this->searchFacets($setup);
         $offset = max(0, $offset);
         $limit = min(max($limit, 1), 100);
-        $key = 'minecrafttoolkit.modrinth.popular.' . sha1(json_encode([$facets, $offset, $limit], JSON_THROW_ON_ERROR));
+        $key = 'minecrafttoolkit.modrinth.popular.'.sha1(json_encode([$facets, $offset, $limit], JSON_THROW_ON_ERROR));
         $data = Cache::remember($key, now()->addMinutes(10), fn (): array => $this->get('/search', [
             'facets' => json_encode($facets, JSON_THROW_ON_ERROR),
             'index' => 'downloads',
@@ -68,7 +68,7 @@ class ModrinthService
     {
         $this->assertEnabled();
         $this->assertIdentifier($projectId);
-        if (!in_array($setup->software, ['paper', 'purpur', 'folia', 'fabric', 'forge', 'neoforge'], true)) {
+        if (! in_array($setup->software, ['paper', 'purpur', 'folia', 'fabric', 'forge', 'neoforge'], true)) {
             throw new MinecraftToolkitException('Diese Serversoftware unterstützt keine Modrinth-Pakete.');
         }
 
@@ -84,15 +84,15 @@ class ModrinthService
             (string) ($a['date_published'] ?? '')
         ));
         $version = collect($versions)->firstWhere('version_type', 'release') ?? ($versions[0] ?? null);
-        if (!is_array($version)) {
+        if (! is_array($version)) {
             throw new MinecraftToolkitException('Keine kompatible Paketversion wurde gefunden.');
         }
 
         $file = collect($version['files'] ?? [])->firstWhere('primary', true)
             ?? collect($version['files'] ?? [])->first();
-        if (!is_array($file)
-            || !is_string($file['url'] ?? null)
-            || !is_string($file['filename'] ?? null)
+        if (! is_array($file)
+            || ! is_string($file['url'] ?? null)
+            || ! is_string($file['filename'] ?? null)
             || strtolower(pathinfo($file['filename'], PATHINFO_EXTENSION)) !== 'jar') {
             throw new MinecraftToolkitException('Die kompatible Version enthält keine installierbare JAR-Datei.');
         }
@@ -119,7 +119,7 @@ class ModrinthService
     }
 
     /** @param array<int, mixed> $hits
-     *  @return array<int, array<string, mixed>>
+     * @return array<int, array<string, mixed>>
      */
     public function normalizeSearchResults(array $hits): array
     {
@@ -131,9 +131,9 @@ class ModrinthService
                 'title' => (string) ($hit['title'] ?? 'Unbekanntes Projekt'),
                 'description' => (string) ($hit['description'] ?? ''),
                 'icon_url' => is_string($hit['icon_url'] ?? null) ? $hit['icon_url'] : null,
-                'project_url' => 'https://modrinth.com/' . (in_array((string) ($hit['project_type'] ?? ''), ['plugin', 'mod'], true)
+                'project_url' => 'https://modrinth.com/'.(in_array((string) ($hit['project_type'] ?? ''), ['plugin', 'mod'], true)
                     ? (string) ($hit['project_type'] ?? 'mod')
-                    : 'mod') . '/' . (string) ($hit['slug'] ?? $hit['project_id']),
+                    : 'mod').'/'.(string) ($hit['slug'] ?? $hit['project_id']),
                 'downloads' => (int) ($hit['downloads'] ?? 0),
                 'author' => (string) ($hit['author'] ?? ''),
                 'server_side' => (string) ($hit['server_side'] ?? 'unknown'),
@@ -189,7 +189,7 @@ class ModrinthService
     private function versions(string $projectId, MinecraftToolkitSetup $setup): array
     {
         $loaders = $this->loaderCandidates($setup->software);
-        $key = 'minecrafttoolkit.modrinth.versions.' . sha1(json_encode([
+        $key = 'minecrafttoolkit.modrinth.versions.'.sha1(json_encode([
             $projectId,
             $loaders,
             $setup->minecraft_version,
@@ -206,7 +206,7 @@ class ModrinthService
     }
 
     /** @param array<string, mixed> $version
-     *  @return array<int, array<string, mixed>>
+     * @return array<int, array<string, mixed>>
      */
     private function dependencyDetails(array $version): array
     {
@@ -219,7 +219,7 @@ class ModrinthService
                 $project = [];
 
                 try {
-                    if (!is_string($projectId) && is_string($dependency['version_id'] ?? null)) {
+                    if (! is_string($projectId) && is_string($dependency['version_id'] ?? null)) {
                         $dependencyVersion = $this->getVersion($dependency['version_id']);
                         $projectId = $dependencyVersion['project_id'] ?? null;
                     }
@@ -241,10 +241,9 @@ class ModrinthService
             ->all();
     }
 
-
     /** @param array<string, mixed> $project
-     *  @param array<int, array<string, mixed>> $dependencies
-     *  @return array<int, array<string, mixed>>
+     * @param  array<int, array<string, mixed>>  $dependencies
+     * @return array<int, array<string, mixed>>
      */
     private function withKnownPluginDependencies(array $project, array $dependencies): array
     {
@@ -263,11 +262,10 @@ class ModrinthService
         }
 
         foreach ($known as $dependency) {
-            $exists = collect($dependencies)->contains(fn (array $existing): bool =>
-                ($existing['project_id'] ?? null) === $dependency['project_id']
+            $exists = collect($dependencies)->contains(fn (array $existing): bool => ($existing['project_id'] ?? null) === $dependency['project_id']
                 || ($existing['slug'] ?? null) === $dependency['slug']
             );
-            if (!$exists) {
+            if (! $exists) {
                 $dependencies[] = $dependency;
             }
         }
@@ -288,7 +286,7 @@ class ModrinthService
     }
 
     /** @param array<string, mixed> $project
-     *  @return array<string, mixed>
+     * @return array<string, mixed>
      */
     private function normalizeProject(array $project): array
     {
@@ -299,7 +297,7 @@ class ModrinthService
             'description' => (string) ($project['description'] ?? ''),
             'icon_url' => is_string($project['icon_url'] ?? null) ? $project['icon_url'] : null,
             'project_url' => is_string($project['slug'] ?? null)
-                ? 'https://modrinth.com/' . (string) ($project['project_type'] ?? 'mod') . '/' . $project['slug']
+                ? 'https://modrinth.com/'.(string) ($project['project_type'] ?? 'mod').'/'.$project['slug']
                 : null,
             'downloads' => (int) ($project['downloads'] ?? 0),
             'server_side' => (string) ($project['server_side'] ?? 'unknown'),
@@ -310,7 +308,7 @@ class ModrinthService
     }
 
     /** @param array<string, scalar> $query
-     *  @return array<string, mixed>
+     * @return array<string, mixed>
      */
     private function get(string $path, array $query = []): array
     {
@@ -319,7 +317,7 @@ class ModrinthService
                 ->withUserAgent((string) config('minecrafttoolkit.user_agent'))
                 ->connectTimeout(5)
                 ->timeout((int) config('minecrafttoolkit.http_timeout', 20))
-                ->get(self::API . $path, $query)
+                ->get(self::API.$path, $query)
                 ->throw()
                 ->json();
         } catch (\Throwable $exception) {
@@ -330,14 +328,14 @@ class ModrinthService
 
     private function assertEnabled(): void
     {
-        if (!(bool) config('minecrafttoolkit.modrinth_enabled', true)) {
+        if (! (bool) config('minecrafttoolkit.modrinth_enabled', true)) {
             throw new MinecraftToolkitException('Modrinth ist in den Minecraft-Toolkit-Einstellungen deaktiviert.');
         }
     }
 
     private function assertIdentifier(string $identifier): void
     {
-        if (!preg_match('/^[A-Za-z0-9!@$()`.+,\'_-]{3,64}$/', $identifier)) {
+        if (! preg_match('/^[A-Za-z0-9!@$()`.+,\'_-]{3,64}$/', $identifier)) {
             throw new MinecraftToolkitException('Die Modrinth-Projektkennung ist ungültig.');
         }
     }

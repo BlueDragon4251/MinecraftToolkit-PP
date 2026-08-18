@@ -37,6 +37,9 @@ class MinecraftUpdaterPage extends Page
     /** @var array<int, array<string, mixed>> */
     public array $history = [];
 
+    /** @var array<int, string> */
+    public array $packageNotes = [];
+
     public function mount(): void
     {
         $this->authorizeAccess();
@@ -45,11 +48,11 @@ class MinecraftUpdaterPage extends Page
 
     public static function canAccess(): bool
     {
-        if (!(bool) config('minecrafttoolkit.enabled', true)
-            || !(bool) config('minecrafttoolkit.updater_enabled', true)
-            || !Schema::hasTable('minecraft_toolkit_setups')
-            || !Schema::hasTable('minecraft_toolkit_packages')
-            || !Schema::hasTable('minecraft_toolkit_update_checks')) {
+        if (! (bool) config('minecrafttoolkit.enabled', true)
+            || ! (bool) config('minecrafttoolkit.updater_enabled', true)
+            || ! Schema::hasTable('minecraft_toolkit_setups')
+            || ! Schema::hasTable('minecraft_toolkit_packages')
+            || ! Schema::hasTable('minecraft_toolkit_update_checks')) {
             return false;
         }
 
@@ -86,7 +89,7 @@ class MinecraftUpdaterPage extends Page
             $checks = app(MinecraftUpdateService::class)->checkAll($this->server(), $this->setup());
             $available = collect($checks)->where('status', 'update_available')->count();
 
-            Notification::make()
+            $notification = Notification::make()
                 ->title(trans('minecrafttoolkit::strings.updater.check_complete'))
                 ->body($available === 1
                     ? trans('minecrafttoolkit::strings.updater.one_update_available')
@@ -123,7 +126,6 @@ class MinecraftUpdaterPage extends Page
         }
     }
 
-
     public function installDependencies(int $packageId): void
     {
         try {
@@ -136,9 +138,11 @@ class MinecraftUpdaterPage extends Page
                     'skipped' => $result['skipped'],
                     'errors' => count($result['errors']),
                 ]))
-                ->status(count($result['errors']) > 0 ? 'warning' : 'success')
-                ->persistent(count($result['errors']) > 0)
-                ->send();
+                ->status(count($result['errors']) > 0 ? 'warning' : 'success');
+            if (count($result['errors']) > 0) {
+                $notification->persistent();
+            }
+            $notification->send();
             $this->refreshPackages();
         } catch (MinecraftToolkitException $exception) {
             $this->notifyError(trans('minecrafttoolkit::strings.updater.dependencies_failed'), $exception);
@@ -155,7 +159,7 @@ class MinecraftUpdaterPage extends Page
         try {
             app(MinecraftRiskGateService::class)->assertAllowed('package_removal', $this->server());
             app(MinecraftUpdateService::class)->deletePackage($this->server(), $packageId);
-            Notification::make()
+            $notification = Notification::make()
                 ->title(trans('minecrafttoolkit::strings.updater.package_deleted'))
                 ->body(trans('minecrafttoolkit::strings.updater.package_deleted_body'))
                 ->warning()
@@ -182,9 +186,11 @@ class MinecraftUpdaterPage extends Page
                     'failed' => $result['failed'],
                     'skipped' => $result['skipped_pinned'],
                 ]))
-                ->status($result['failed'] > 0 ? 'warning' : 'success')
-                ->persistent($result['failed'] > 0)
-                ->send();
+                ->status($result['failed'] > 0 ? 'warning' : 'success');
+            if ($result['failed'] > 0) {
+                $notification->persistent();
+            }
+            $notification->send();
             $this->refreshPackages();
         } catch (MinecraftToolkitException $exception) {
             $this->notifyError(trans('minecrafttoolkit::strings.updater.update_all_failed'), $exception);
@@ -230,12 +236,14 @@ class MinecraftUpdaterPage extends Page
     {
         try {
             $result = app(MinecraftUpdateService::class)->verifyPackage($this->server(), $packageId);
-            Notification::make()
+            $notification = Notification::make()
                 ->title(trans('minecrafttoolkit::strings.updater.verify_complete'))
                 ->body($result['message'])
-                ->status($result['status'] === 'verified' ? 'success' : 'danger')
-                ->persistent($result['status'] !== 'verified')
-                ->send();
+                ->status($result['status'] === 'verified' ? 'success' : 'danger');
+            if ($result['status'] !== 'verified') {
+                $notification->persistent();
+            }
+            $notification->send();
             $this->refreshPackages();
         } catch (MinecraftToolkitException $exception) {
             $this->notifyError(trans('minecrafttoolkit::strings.updater.verify_failed'), $exception);
@@ -268,16 +276,67 @@ class MinecraftUpdaterPage extends Page
             }
         }
 
-        Notification::make()
+        $notification = Notification::make()
             ->title(trans('minecrafttoolkit::strings.updater.bulk_verify_complete'))
             ->body(trans('minecrafttoolkit::strings.updater.bulk_verify_body', [
                 'verified' => $verified,
                 'failed' => $failed,
             ]))
-            ->status($failed > 0 ? 'warning' : 'success')
-            ->persistent($failed > 0)
-            ->send();
+            ->status($failed > 0 ? 'warning' : 'success');
+        if ($failed > 0) {
+            $notification->persistent();
+        }
+        $notification->send();
 
+        $this->refreshPackages();
+    }
+
+    public function togglePackage(int $packageId, bool $enabled): void
+    {
+        try {
+            app(MinecraftUpdateService::class)->setPackageEnabled($this->server(), $packageId, $enabled);
+            Notification::make()->success()->title($enabled
+                ? trans('minecrafttoolkit::strings.updater.package_enabled')
+                : trans('minecrafttoolkit::strings.updater.package_disabled'))->send();
+            $this->refreshPackages();
+        } catch (MinecraftToolkitException $exception) {
+            $this->notifyError(trans('minecrafttoolkit::strings.updater.toggle_failed'), $exception);
+        }
+    }
+
+    public function reinstallPackage(int $packageId): void
+    {
+        try {
+            $package = app(MinecraftUpdateService::class)->reinstallPackage($this->server(), $this->setup(), $packageId);
+            Notification::make()->success()->title(trans('minecrafttoolkit::strings.updater.package_reinstalled', ['name' => $package->project_name]))->send();
+            $this->refreshPackages();
+        } catch (MinecraftToolkitException $exception) {
+            $this->notifyError(trans('minecrafttoolkit::strings.updater.reinstall_failed'), $exception);
+        }
+    }
+
+    public function disableAllPackages(): void
+    {
+        $changed = 0;
+        foreach ($this->packages as $package) {
+            if ($package['enabled'] && $package['can_disable']) {
+                try {
+                    app(MinecraftUpdateService::class)->setPackageEnabled($this->server(), (int) $package['id'], false);
+                    $changed++;
+                } catch (MinecraftToolkitException) {
+                }
+            }
+        }
+        Notification::make()->success()->title(trans('minecrafttoolkit::strings.updater.bulk_disable_complete', ['count' => $changed]))->send();
+        $this->refreshPackages();
+    }
+
+    public function savePackageNote(int $packageId): void
+    {
+        abort_unless(user()?->isRootAdmin(), 403);
+        $package = MinecraftToolkitPackage::query()->whereKey($packageId)->where('server_uuid', $this->server()->uuid)->firstOrFail();
+        $package->update(['admin_notes' => trim((string) ($this->packageNotes[$packageId] ?? '')) ?: null]);
+        Notification::make()->success()->title(trans('minecrafttoolkit::strings.updater.note_saved'))->send();
         $this->refreshPackages();
     }
 
@@ -307,7 +366,6 @@ class MinecraftUpdaterPage extends Page
         $count = MinecraftToolkitPackage::query()
             ->where('server_uuid', $this->server()->uuid)
             ->where('managed', true)
-            ->where('enabled', true)
             ->whereIn('package_type', ['server_jar', 'server_binary', 'plugin', 'mod', 'crossplay', 'dependency'])
             ->update(['update_pinned' => $pinned]);
 
@@ -321,7 +379,6 @@ class MinecraftUpdaterPage extends Page
         $this->packages = MinecraftToolkitPackage::query()
             ->where('server_uuid', $this->server()->uuid)
             ->where('managed', true)
-            ->where('enabled', true)
             ->whereIn('package_type', ['server_jar', 'server_binary', 'plugin', 'mod', 'crossplay', 'dependency'])
             ->orderByDesc('is_system_package')
             ->orderBy('project_name')
@@ -354,15 +411,20 @@ class MinecraftUpdaterPage extends Page
                     'checked_at' => $check?->checked_at?->diffForHumans(),
                     'system' => $package->is_system_package,
                     'pinned' => (bool) $package->update_pinned,
+                    'enabled' => (bool) $package->enabled,
                     'health' => $this->packageHealth($package, $check),
                     'can_install_dependencies' => $check?->status === 'error'
                         && is_string($check?->message)
                         && (str_contains($check->message, 'Pflicht-Abhängigkeiten')
                             || str_contains($check->message, 'Fehlende Plugin-Abhängigkeit')),
-                    'can_delete' => !$package->is_system_package,
+                    'can_delete' => ! $package->is_system_package,
+                    'can_disable' => ! in_array($package->package_type, ['server_jar', 'server_binary'], true),
+                    'admin_notes' => $package->admin_notes,
                 ];
             })
             ->all();
+
+        $this->packageNotes = collect($this->packages)->mapWithKeys(fn (array $package): array => [(int) $package['id'] => (string) ($package['admin_notes'] ?? '')])->all();
 
         $this->history = MinecraftToolkitUpdateCheck::query()
             ->with('package')
@@ -371,7 +433,7 @@ class MinecraftUpdaterPage extends Page
             ->limit(20)
             ->get()
             ->map(fn (MinecraftToolkitUpdateCheck $check): array => [
-                'package' => $check->package?->project_name ?? 'Gelöschtes Paket',
+                'package' => $check->package?->project_name ?? trans('minecrafttoolkit::strings.updater.deleted_package'),
                 'status' => $check->status,
                 'old_version' => $check->old_version_number,
                 'new_version' => $check->new_version_number,
@@ -414,7 +476,7 @@ class MinecraftUpdaterPage extends Page
         if ($check?->status === 'verified') {
             $score += 10;
             $reasons[] = trans('minecrafttoolkit::strings.updater.health_verified');
-        } elseif ($check?->status === 'error') {
+        } elseif (in_array($check?->status, ['error', 'rollback_recommended'], true)) {
             $score -= 25;
             $reasons[] = trans('minecrafttoolkit::strings.updater.health_error');
         } elseif ($check?->status === 'update_available') {
