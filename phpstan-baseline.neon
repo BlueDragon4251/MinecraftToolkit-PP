@@ -211,12 +211,6 @@ parameters:
 			path: src/Filament/Server/Pages/MinecraftSetupPage.php
 
 		-
-			message: '#^Parameter \#1 \$view of function view expects view\-string\|null, string given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Filament/Server/Pages/MinecraftSetupPage.php
-
-		-
 			message: '#^Strict comparison using \=\=\= between '''' and '''' will always evaluate to true\.$#'
 			identifier: identical.alwaysTrue
 			count: 1
@@ -575,12 +569,6 @@ parameters:
 			identifier: property.notFound
 			count: 1
 			path: src/Jobs/InstallMinecraftModpackJob.php
-
-		-
-			message: '#^Parameter \#1 \$view of function view expects view\-string\|null, string given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Livewire/BlueItAnnouncements.php
 
 		-
 			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitSetup\:\:\$setup_status\.$#'

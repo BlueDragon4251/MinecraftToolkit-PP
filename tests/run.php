@@ -10,10 +10,13 @@ if (! function_exists('mb_split')) {
 }
 
 $root = dirname(__DIR__, 2);
-$loader = require $root.'/pelican/vendor/autoload.php';
+$panelPath = getenv('PELICAN_PANEL_PATH') ?: $root.'/pelican';
+$loader = require $panelPath.'/vendor/autoload.php';
 $loader->addPsr4('BlueWolf\\MinecraftToolkit\\', dirname(__DIR__).'/src/');
 require_once __DIR__.'/FakeMinecraftFileRepository.php';
 
+use App\Models\Backup;
+use App\Models\Server;
 use BlueWolf\MinecraftToolkit\Exceptions\MinecraftToolkitException;
 use BlueWolf\MinecraftToolkit\Models\MinecraftToolkitPackage;
 use BlueWolf\MinecraftToolkit\Models\MinecraftToolkitSetup;
@@ -26,10 +29,12 @@ use BlueWolf\MinecraftToolkit\Services\MinecraftModpackService;
 use BlueWolf\MinecraftToolkit\Services\MinecraftPackageInstaller;
 use BlueWolf\MinecraftToolkit\Services\MinecraftPropertiesService;
 use BlueWolf\MinecraftToolkit\Services\MinecraftServerFileService;
+use BlueWolf\MinecraftToolkit\Services\MinecraftSetupOperationService;
 use BlueWolf\MinecraftToolkit\Services\MinecraftSoftwareService;
 use BlueWolf\MinecraftToolkit\Services\MinecraftUpdateService;
 use BlueWolf\MinecraftToolkit\Services\ModrinthService;
 use BlueWolf\MinecraftToolkit\Tests\FakeMinecraftFileRepository;
+use Illuminate\Support\Carbon;
 
 $tests = [];
 
@@ -40,6 +45,59 @@ $tests['fake Wings file repository'] = function (): void {
     if ($repository->exists('/plugins/test.jar.tmp') || $repository->get('/plugins/test.jar') !== 'verified') {
         throw new RuntimeException('Fake Wings atomic move failed.');
     }
+};
+
+$tests['setup safety existing-data detection'] = function (): void {
+    $operationService = new MinecraftSetupOperationService;
+    $server = new Server;
+    $files = new class extends MinecraftServerFileService
+    {
+        /** @var array<int, array<string, mixed>> */
+        public array $entries = [];
+
+        public function listDirectory(Server $server, string $path): array
+        {
+            return $this->entries;
+        }
+    };
+
+    $files->entries = [];
+    assertSame(false, $operationService->hasExistingServerData($server, $files));
+    $files->entries = [['name' => '.minecraft-toolkit', 'is_file' => false]];
+    assertSame(false, $operationService->hasExistingServerData($server, $files));
+    $files->entries = [['name' => 'world', 'is_file' => false]];
+    assertSame(true, $operationService->hasExistingServerData($server, $files));
+    $files->entries = [['name' => 'server.properties', 'is_file' => true]];
+    assertSame(true, $operationService->hasExistingServerData($server, $files));
+};
+
+$tests['setup safety backup verification states'] = function (): void {
+    $service = new MinecraftSetupOperationService;
+    $now = Carbon::parse('2026-08-21 12:00:00');
+    $backup = static function (array $attributes): Backup {
+        $model = new class extends Backup
+        {
+            public function getDateFormat(): string
+            {
+                return 'Y-m-d H:i:s';
+            }
+        };
+        $model->forceFill($attributes);
+
+        return $model;
+    };
+
+    $waiting = $backup(['created_at' => $now->copy()->subMinutes(10), 'completed_at' => null]);
+    assertSame('waiting', $service->safetyBackupState($waiting, $now, 120));
+
+    $timedOut = $backup(['created_at' => $now->copy()->subMinutes(121), 'completed_at' => null]);
+    assertSame('timed_out', $service->safetyBackupState($timedOut, $now, 120));
+
+    $failed = $backup(['created_at' => $now, 'completed_at' => $now, 'is_successful' => false, 'checksum' => null]);
+    assertSame('failed', $service->safetyBackupState($failed, $now, 120));
+
+    $verified = $backup(['created_at' => $now, 'completed_at' => $now, 'is_successful' => true, 'checksum' => 'sha256:example']);
+    assertSame('verified', $service->safetyBackupState($verified, $now, 120));
 };
 
 $tests['source response fixtures'] = function (): void {

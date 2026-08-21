@@ -8,14 +8,15 @@ use App\Models\Server;
 use BackedEnum;
 use BlueWolf\MinecraftToolkit\Exceptions\MinecraftToolkitException;
 use BlueWolf\MinecraftToolkit\Models\MinecraftToolkitSetup;
+use BlueWolf\MinecraftToolkit\Models\MinecraftToolkitSetupOperation;
 use BlueWolf\MinecraftToolkit\Services\CurseForgeService;
-use BlueWolf\MinecraftToolkit\Services\MinecraftModpackService;
 use BlueWolf\MinecraftToolkit\Services\MinecraftPermissionService;
 use BlueWolf\MinecraftToolkit\Services\MinecraftRiskGateService;
-use BlueWolf\MinecraftToolkit\Services\MinecraftSetupService;
+use BlueWolf\MinecraftToolkit\Services\MinecraftSetupOperationService;
 use BlueWolf\MinecraftToolkit\Services\MinecraftSoftwareService;
 use BlueWolf\MinecraftToolkit\Services\ModrinthService;
 use Filament\Facades\Filament;
+use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Placeholder;
@@ -68,9 +69,20 @@ class MinecraftSetupPage extends Page implements HasSchemas
 
     public string $setupPackageResultsTitle = '';
 
+    public bool $hasActiveSetupOperation = false;
+
+    public ?string $setupOperationStatus = null;
+
+    public ?string $setupOperationStage = null;
+
+    public ?string $setupOperationError = null;
+
+    public ?string $setupSafetyBackupUuid = null;
+
     public function mount(): void
     {
         $this->authorizeAccess();
+        $this->refreshOperationState();
         $this->form->fill($this->defaults());
         $this->setupPackageResults = [];
         $this->setupPackageResultsTitle = trans('minecrafttoolkit::strings.setup.package_browser_waiting');
@@ -386,7 +398,11 @@ class MinecraftSetupPage extends Page implements HasSchemas
                                 ]);
                             })
                             ->schema([
-                                Hidden::make('review_confirmed')->default(true),
+                                Checkbox::make('review_confirmed')
+                                    ->label(trans('minecrafttoolkit::strings.setup.safety_confirmation'))
+                                    ->helperText(trans('minecrafttoolkit::strings.setup.safety_confirmation_help'))
+                                    ->accepted()
+                                    ->required(),
                             ]),
                     ]),
             ])->columnSpanFull(),
@@ -407,7 +423,6 @@ class MinecraftSetupPage extends Page implements HasSchemas
                 $modpackUpload = reset($modpackUpload) ?: null;
             }
             $modpackMode = (string) ($state['setup_modpack_mode'] ?? 'combine');
-            $usesBootstrapInstaller = in_array($state['software'] ?? null, ['forge', 'neoforge', 'bedrock'], true);
             unset(
                 $state['server_icon'],
                 $state['setup_modpack_upload'],
@@ -423,27 +438,25 @@ class MinecraftSetupPage extends Page implements HasSchemas
                 $state['setup_package_query']
             );
 
-            app(MinecraftSetupService::class)->setup($server, $state, $icon);
-            if ($modpackUpload !== null) {
-                $setup = MinecraftToolkitSetup::query()
-                    ->where('server_uuid', $server->uuid)
-                    ->where('setup_status', 'completed')
-                    ->latest('id')
-                    ->first();
-                if ($setup instanceof MinecraftToolkitSetup) {
-                    app(MinecraftModpackService::class)->installUpload($server, $setup, $modpackUpload, $modpackMode);
-                }
-            }
+            $operation = app(MinecraftSetupOperationService::class)->queue(
+                $server,
+                $state,
+                $icon,
+                $modpackUpload,
+                $modpackMode,
+                user()?->id,
+            );
+            $this->hasActiveSetupOperation = true;
+            $this->setupOperationStatus = $operation->status;
+            $this->setupOperationStage = $operation->stage;
+            $this->setupOperationError = null;
+            $this->setupSafetyBackupUuid = null;
 
             Notification::make()
-                ->title(trans('minecrafttoolkit::strings.setup.complete'))
-                ->body($usesBootstrapInstaller
-                    ? trans('minecrafttoolkit::strings.setup.complete_installer_body')
-                    : trans('minecrafttoolkit::strings.setup.complete_body'))
-                ->success()
+                ->title(trans('minecrafttoolkit::strings.setup.operation_queued'))
+                ->body(trans('minecrafttoolkit::strings.setup.operation_queued_body'))
+                ->info()
                 ->send();
-
-            $this->redirect(MinecraftOverviewPage::getUrl(panel: 'server', tenant: $server));
         } catch (MinecraftToolkitException $exception) {
             Notification::make()
                 ->title(trans('minecrafttoolkit::strings.setup.failed'))
@@ -451,6 +464,40 @@ class MinecraftSetupPage extends Page implements HasSchemas
                 ->danger()
                 ->persistent()
                 ->send();
+        }
+    }
+
+    public function refreshOperationState(): void
+    {
+        if (! Schema::hasTable('minecraft_toolkit_setup_operations')) {
+            $this->hasActiveSetupOperation = false;
+
+            return;
+        }
+
+        $server = Filament::getTenant();
+        if (! $server instanceof Server) {
+            return;
+        }
+
+        $operation = MinecraftToolkitSetupOperation::query()
+            ->where('server_id', $server->id)
+            ->latest('id')
+            ->first();
+        if (! $operation instanceof MinecraftToolkitSetupOperation) {
+            $this->hasActiveSetupOperation = false;
+
+            return;
+        }
+
+        $this->hasActiveSetupOperation = $operation->isActive();
+        $this->setupOperationStatus = $operation->status;
+        $this->setupOperationStage = $operation->stage;
+        $this->setupOperationError = $operation->last_error;
+        $this->setupSafetyBackupUuid = $operation->backup?->uuid;
+
+        if ($operation->status === 'completed') {
+            $this->redirect(MinecraftOverviewPage::getUrl(panel: 'server', tenant: $server));
         }
     }
 
