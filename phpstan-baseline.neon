@@ -1319,3 +1319,15 @@ parameters:
 			identifier: return.type
 			count: 1
 			path: src/Services/ModrinthService.php
+
+		-
+			message: '#^Parameter \#1 \$view of function view expects view\-string\|null, string given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Filament/Server/Pages/MinecraftSetupPage.php
+
+		-
+			message: '#^Parameter \#1 \$view of function view expects view\-string\|null, string given\.$#'
+			identifier: argument.type
+			count: 1
+			path: src/Livewire/BlueItAnnouncements.php

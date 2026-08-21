@@ -11,6 +11,7 @@ parameters:
     tmpDir: .phpstan-cache
     scanFiles: []
     scanDirectories: []
+    reportUnmatchedIgnoredErrors: false
     ignoreErrors: []
     excludePaths:
         - vendor (?)
