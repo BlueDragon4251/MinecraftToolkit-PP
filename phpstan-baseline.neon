@@ -1,3 +1,1321 @@
 parameters:
-    ignoreErrors: []
-    reportUnmatchedIgnoredErrors: true
+	ignoreErrors:
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitPackage\:\:\$file_name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Filament/Server/Pages/MinecraftInstallerPage.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitPackage\:\:\$file_path\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Filament/Server/Pages/MinecraftInstallerPage.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitPackage\:\:\$installed_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Filament/Server/Pages/MinecraftInstallerPage.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitPackage\:\:\$managed\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Filament/Server/Pages/MinecraftInstallerPage.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitPackage\:\:\$project_name\.$#'
+			identifier: property.notFound
+			count: 2
+			path: src/Filament/Server/Pages/MinecraftInstallerPage.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitPackage\:\:\$source\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Filament/Server/Pages/MinecraftInstallerPage.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitPackage\:\:\$version_number\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Filament/Server/Pages/MinecraftInstallerPage.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitSetup\:\:\$software\.$#'
+			identifier: property.notFound
+			count: 4
+			path: src/Filament/Server/Pages/MinecraftInstallerPage.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitPackage\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: src/Filament/Server/Pages/MinecraftInstallerPage.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitSetup\:\:\$bedrock_allocation_port\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Filament/Server/Pages/MinecraftManagementPage.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitSetup\:\:\$edition\.$#'
+			identifier: property.notFound
+			count: 2
+			path: src/Filament/Server/Pages/MinecraftManagementPage.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitSetup\:\:\$geyser_enabled\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Filament/Server/Pages/MinecraftManagementPage.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitSetup\:\:\$level_name\.$#'
+			identifier: property.notFound
+			count: 5
+			path: src/Filament/Server/Pages/MinecraftManagementPage.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitSetup\:\:\$software\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Filament/Server/Pages/MinecraftManagementPage.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitModpack\:\:\$active\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Filament/Server/Pages/MinecraftModpacksPage.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitModpack\:\:\$file_name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Filament/Server/Pages/MinecraftModpacksPage.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitModpack\:\:\$installed_at\.$#'
+			identifier: property.notFound
+			count: 2
+			path: src/Filament/Server/Pages/MinecraftModpacksPage.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitModpack\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Filament/Server/Pages/MinecraftModpacksPage.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitModpack\:\:\$source\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Filament/Server/Pages/MinecraftModpacksPage.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitModpack\:\:\$version_number\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Filament/Server/Pages/MinecraftModpacksPage.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitModpack\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: src/Filament/Server/Pages/MinecraftModpacksPage.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitPackage\:\:\$file_name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Filament/Server/Pages/MinecraftOverviewPage.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitPackage\:\:\$file_path\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Filament/Server/Pages/MinecraftOverviewPage.php
+
+		-
+			message: '#^Offset ''files'' on array\{path\: string, created\: string, files\: array\<int, array\{name\: string, size\: int\|null\}\>\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: src/Filament/Server/Pages/MinecraftOverviewPage.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitProfile\:\:\$description\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Filament/Server/Pages/MinecraftProfilesPage.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitProfile\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 2
+			path: src/Filament/Server/Pages/MinecraftProfilesPage.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitProfile\:\:\$user_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Filament/Server/Pages/MinecraftProfilesPage.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitProfile\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: src/Filament/Server/Pages/MinecraftProfilesPage.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitSetup\:\:\$bedrock_allocation_ip\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Filament/Server/Pages/MinecraftSettingsPage.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitSetup\:\:\$bedrock_allocation_port\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Filament/Server/Pages/MinecraftSettingsPage.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitSetup\:\:\$software\.$#'
+			identifier: property.notFound
+			count: 2
+			path: src/Filament/Server/Pages/MinecraftSettingsPage.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$allocation\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Filament/Server/Pages/MinecraftSetupPage.php
+
+		-
+			message: '#^Method BlueWolf\\MinecraftToolkit\\Filament\\Server\\Pages\\MinecraftSetupPage\:\:motdColorOptions\(\) should return array\<string, string\> but returns array\<int\|string, \(array\|string\)\>\.$#'
+			identifier: return.type
+			count: 1
+			path: src/Filament/Server/Pages/MinecraftSetupPage.php
+
+		-
+			message: '#^Method BlueWolf\\MinecraftToolkit\\Filament\\Server\\Pages\\MinecraftSetupPage\:\:popularPackageOptions\(\) is unused\.$#'
+			identifier: method.unused
+			count: 1
+			path: src/Filament/Server/Pages/MinecraftSetupPage.php
+
+		-
+			message: '#^Method BlueWolf\\MinecraftToolkit\\Filament\\Server\\Pages\\MinecraftSetupPage\:\:searchPackageOptions\(\) is unused\.$#'
+			identifier: method.unused
+			count: 1
+			path: src/Filament/Server/Pages/MinecraftSetupPage.php
+
+		-
+			message: '#^Strict comparison using \=\=\= between '''' and '''' will always evaluate to true\.$#'
+			identifier: identical.alwaysTrue
+			count: 1
+			path: src/Filament/Server/Pages/MinecraftSetupPage.php
+
+		-
+			message: '#^Unreachable statement \- code above always terminates\.$#'
+			identifier: deadCode.unreachable
+			count: 1
+			path: src/Filament/Server/Pages/MinecraftSetupPage.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>port" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: src/Filament/Server/Pages/MinecraftSetupPage.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitPackage\:\:\$admin_notes\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Filament/Server/Pages/MinecraftUpdaterPage.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitPackage\:\:\$dependencies_json\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Filament/Server/Pages/MinecraftUpdaterPage.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitPackage\:\:\$enabled\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Filament/Server/Pages/MinecraftUpdaterPage.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitPackage\:\:\$file_name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Filament/Server/Pages/MinecraftUpdaterPage.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitPackage\:\:\$file_path\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Filament/Server/Pages/MinecraftUpdaterPage.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitPackage\:\:\$installed_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Filament/Server/Pages/MinecraftUpdaterPage.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitPackage\:\:\$is_system_package\.$#'
+			identifier: property.notFound
+			count: 2
+			path: src/Filament/Server/Pages/MinecraftUpdaterPage.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitPackage\:\:\$loader\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Filament/Server/Pages/MinecraftUpdaterPage.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitPackage\:\:\$minecraft_version\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Filament/Server/Pages/MinecraftUpdaterPage.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitPackage\:\:\$package_type\.$#'
+			identifier: property.notFound
+			count: 2
+			path: src/Filament/Server/Pages/MinecraftUpdaterPage.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitPackage\:\:\$project_name\.$#'
+			identifier: property.notFound
+			count: 3
+			path: src/Filament/Server/Pages/MinecraftUpdaterPage.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitPackage\:\:\$sha1\.$#'
+			identifier: property.notFound
+			count: 2
+			path: src/Filament/Server/Pages/MinecraftUpdaterPage.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitPackage\:\:\$sha512\.$#'
+			identifier: property.notFound
+			count: 2
+			path: src/Filament/Server/Pages/MinecraftUpdaterPage.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitPackage\:\:\$source\.$#'
+			identifier: property.notFound
+			count: 2
+			path: src/Filament/Server/Pages/MinecraftUpdaterPage.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitPackage\:\:\$source_project_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Filament/Server/Pages/MinecraftUpdaterPage.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitPackage\:\:\$source_version_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Filament/Server/Pages/MinecraftUpdaterPage.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitPackage\:\:\$update_pinned\.$#'
+			identifier: property.notFound
+			count: 2
+			path: src/Filament/Server/Pages/MinecraftUpdaterPage.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitPackage\:\:\$version_number\.$#'
+			identifier: property.notFound
+			count: 2
+			path: src/Filament/Server/Pages/MinecraftUpdaterPage.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitUpdateCheck\:\:\$checked_at\.$#'
+			identifier: property.notFound
+			count: 2
+			path: src/Filament/Server/Pages/MinecraftUpdaterPage.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitUpdateCheck\:\:\$message\.$#'
+			identifier: property.notFound
+			count: 3
+			path: src/Filament/Server/Pages/MinecraftUpdaterPage.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitUpdateCheck\:\:\$new_version_number\.$#'
+			identifier: property.notFound
+			count: 2
+			path: src/Filament/Server/Pages/MinecraftUpdaterPage.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitUpdateCheck\:\:\$old_version_number\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Filament/Server/Pages/MinecraftUpdaterPage.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitUpdateCheck\:\:\$status\.$#'
+			identifier: property.notFound
+			count: 6
+			path: src/Filament/Server/Pages/MinecraftUpdaterPage.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$project_name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Filament/Server/Pages/MinecraftUpdaterPage.php
+
+		-
+			message: '#^Offset ''status'' on array\{status\: string, message\: string, metadata\: array\<string, mixed\>\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: src/Filament/Server/Pages/MinecraftUpdaterPage.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitPackage\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: src/Filament/Server/Pages/MinecraftUpdaterPage.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitUpdateCheck\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: src/Filament/Server/Pages/MinecraftUpdaterPage.php
+
+		-
+			message: '#^Parameter \#1 \$value of function collect contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: src/Filament/Server/Pages/MinecraftUpdaterPage.php
+
+		-
+			message: '#^Undefined variable\: \$notification$#'
+			identifier: variable.undefined
+			count: 4
+			path: src/Filament/Server/Pages/MinecraftUpdaterPage.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>project_name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: src/Filament/Server/Pages/MinecraftUpdaterPage.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>status" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: src/Filament/Server/Pages/MinecraftUpdaterPage.php
+
+		-
+			message: '#^Using nullsafe property access on non\-nullable type BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitUpdateCheck\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: src/Filament/Server/Pages/MinecraftUpdaterPage.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitSetup\:\:\$loader_version\.$#'
+			identifier: property.notFound
+			count: 2
+			path: src/Filament/Server/Pages/MinecraftVersionChangePage.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitSetup\:\:\$minecraft_version\.$#'
+			identifier: property.notFound
+			count: 4
+			path: src/Filament/Server/Pages/MinecraftVersionChangePage.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitSetup\:\:\$software\.$#'
+			identifier: property.notFound
+			count: 5
+			path: src/Filament/Server/Pages/MinecraftVersionChangePage.php
+
+		-
+			message: '#^Undefined variable\: \$notification$#'
+			identifier: variable.undefined
+			count: 2
+			path: src/Filament/Server/Pages/MinecraftVersionChangePage.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitPackage\:\:\$admin_notes\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Http/Controllers/MinecraftToolkitStateController.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitPackage\:\:\$file_path\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Http/Controllers/MinecraftToolkitStateController.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitPackage\:\:\$package_type\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Http/Controllers/MinecraftToolkitStateController.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitPackage\:\:\$project_name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Http/Controllers/MinecraftToolkitStateController.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitPackage\:\:\$source\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Http/Controllers/MinecraftToolkitStateController.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitPackage\:\:\$source_project_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Http/Controllers/MinecraftToolkitStateController.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitPackage\:\:\$update_pinned\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Http/Controllers/MinecraftToolkitStateController.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitPackage\:\:\$version_number\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Http/Controllers/MinecraftToolkitStateController.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitSetup\:\:\$crossplay_enabled\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Http/Controllers/MinecraftToolkitStateController.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitSetup\:\:\$edition\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Http/Controllers/MinecraftToolkitStateController.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitSetup\:\:\$loader\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Http/Controllers/MinecraftToolkitStateController.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitSetup\:\:\$loader_version\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Http/Controllers/MinecraftToolkitStateController.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitSetup\:\:\$minecraft_version\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Http/Controllers/MinecraftToolkitStateController.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitSetup\:\:\$server_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Http/Controllers/MinecraftToolkitStateController.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitSetup\:\:\$server_uuid\.$#'
+			identifier: property.notFound
+			count: 3
+			path: src/Http/Controllers/MinecraftToolkitStateController.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitSetup\:\:\$setup_status\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Http/Controllers/MinecraftToolkitStateController.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitSetup\:\:\$software\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Http/Controllers/MinecraftToolkitStateController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitPackage\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: src/Http/Controllers/MinecraftToolkitStateController.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitPackage\:\:\$project_name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Jobs/CheckMinecraftPostUpdateHealthJob.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitSetup\:\:\$server_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Jobs/CheckMinecraftToolkitUpdatesJob.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitModpack\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Jobs/InstallMinecraftModpackJob.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitSetup\:\:\$setup_status\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Models/MinecraftToolkitSetup.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$server_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Providers/MinecraftToolkitPluginProvider.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$permissions\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Services/BlueItAnnouncementService.php
+
+		-
+			message: '#^Call to function is_array\(\) with array will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: src/Services/BlueItAnnouncementService.php
+
+		-
+			message: '#^Call to function is_array\(\) with array\<int, array\<string, mixed\>\> will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: src/Services/BlueItAnnouncementService.php
+
+		-
+			message: '#^Method Illuminate\\Http\\Client\\Response\:\:header\(\) invoked with 2 parameters, 1 required\.$#'
+			identifier: arguments.count
+			count: 1
+			path: src/Services/BlueItAnnouncementService.php
+
+		-
+			message: '#^Offset ''announcements'' on array\{available\: bool, announcements\: array\<int, array\<string, mixed\>\>\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: src/Services/BlueItAnnouncementService.php
+
+		-
+			message: '#^Offset ''available'' on array\{available\: bool, announcements\: array\<int, array\<string, mixed\>\>\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: src/Services/BlueItAnnouncementService.php
+
+		-
+			message: '#^Method BlueWolf\\MinecraftToolkit\\Services\\CurseForgeApiKeyProvider\:\:embeddedKey\(\) never returns string so it can be removed from the return type\.$#'
+			identifier: return.unusedType
+			count: 1
+			path: src/Services/CurseForgeApiKeyProvider.php
+
+		-
+			message: '#^Strict comparison using \=\=\= between array\{\} and array\{\} will always evaluate to true\.$#'
+			identifier: identical.alwaysTrue
+			count: 1
+			path: src/Services/CurseForgeApiKeyProvider.php
+
+		-
+			message: '#^Unreachable statement \- code above always terminates\.$#'
+			identifier: deadCode.unreachable
+			count: 1
+			path: src/Services/CurseForgeApiKeyProvider.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitSetup\:\:\$minecraft_version\.$#'
+			identifier: property.notFound
+			count: 2
+			path: src/Services/CurseForgeService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitSetup\:\:\$software\.$#'
+			identifier: property.notFound
+			count: 4
+			path: src/Services/CurseForgeService.php
+
+		-
+			message: '#^Call to function is_array\(\) with array\<string, mixed\> will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 3
+			path: src/Services/CurseForgeService.php
+
+		-
+			message: '#^Offset ''relationType'' on non\-empty\-array on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: src/Services/CurseForgeService.php
+
+		-
+			message: '#^Strict comparison using \!\=\= between non\-empty\-string and '''' will always evaluate to true\.$#'
+			identifier: notIdentical.alwaysTrue
+			count: 1
+			path: src/Services/CurseForgeService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitPackage\:\:\$enabled\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Services/MinecraftCompatibilityService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitPackage\:\:\$is_system_package\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Services/MinecraftCompatibilityService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitPackage\:\:\$package_type\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Services/MinecraftCompatibilityService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitPackage\:\:\$project_name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Services/MinecraftCompatibilityService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitPackage\:\:\$source\.$#'
+			identifier: property.notFound
+			count: 3
+			path: src/Services/MinecraftCompatibilityService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitPackage\:\:\$source_project_id\.$#'
+			identifier: property.notFound
+			count: 4
+			path: src/Services/MinecraftCompatibilityService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitPackage\:\:\$source_version_id\.$#'
+			identifier: property.notFound
+			count: 3
+			path: src/Services/MinecraftCompatibilityService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitPackage\:\:\$update_pinned\.$#'
+			identifier: property.notFound
+			count: 4
+			path: src/Services/MinecraftCompatibilityService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitPackage\:\:\$updated_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Services/MinecraftCompatibilityService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitPackage\:\:\$version_number\.$#'
+			identifier: property.notFound
+			count: 2
+			path: src/Services/MinecraftCompatibilityService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitSetup\:\:\$loader\.$#'
+			identifier: property.notFound
+			count: 2
+			path: src/Services/MinecraftCompatibilityService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitSetup\:\:\$loader_version\.$#'
+			identifier: property.notFound
+			count: 2
+			path: src/Services/MinecraftCompatibilityService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitSetup\:\:\$minecraft_version\.$#'
+			identifier: property.notFound
+			count: 2
+			path: src/Services/MinecraftCompatibilityService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitSetup\:\:\$software\.$#'
+			identifier: property.notFound
+			count: 4
+			path: src/Services/MinecraftCompatibilityService.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitPackage\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: src/Services/MinecraftCompatibilityService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitPackage\:\:\$project_name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Services/MinecraftConflictService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitPackage\:\:\$source_project_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Services/MinecraftConflictService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitPackage\:\:\$source_project_slug\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Services/MinecraftConflictService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitSetup\:\:\$loader\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Services/MinecraftConflictService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitSetup\:\:\$software\.$#'
+			identifier: property.notFound
+			count: 3
+			path: src/Services/MinecraftConflictService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitSetup\:\:\$minecraft_version\.$#'
+			identifier: property.notFound
+			count: 2
+			path: src/Services/MinecraftConversionService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitSetup\:\:\$server_jar_path\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Services/MinecraftConversionService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitSetup\:\:\$software\.$#'
+			identifier: property.notFound
+			count: 2
+			path: src/Services/MinecraftConversionService.php
+
+		-
+			message: '#^Offset ''version_id'' on array\{url\: string, source\: string, version_id\: string, file_name\: string, startup\: string\|null, installer\: bool, sha256\: string\|null\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: src/Services/MinecraftConversionService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitSetup\:\:\$bedrock_allocation_port\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Services/MinecraftCrossplayService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitSetup\:\:\$minecraft_version\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Services/MinecraftCrossplayService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitSetup\:\:\$motd\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Services/MinecraftCrossplayService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitSetup\:\:\$software\.$#'
+			identifier: property.notFound
+			count: 2
+			path: src/Services/MinecraftCrossplayService.php
+
+		-
+			message: '#^Offset 1 on array\{non\-falsy\-string, string\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: src/Services/MinecraftCrossplayService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitModpack\:\:\$active\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Services/MinecraftModpackService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitModpack\:\:\$files_json\.$#'
+			identifier: property.notFound
+			count: 2
+			path: src/Services/MinecraftModpackService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitModpack\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 2
+			path: src/Services/MinecraftModpackService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitSetup\:\:\$loader\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Services/MinecraftModpackService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitSetup\:\:\$loader_version\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Services/MinecraftModpackService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitSetup\:\:\$minecraft_version\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Services/MinecraftModpackService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitSetup\:\:\$loader_version\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Services/MinecraftPackageInstaller.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitSetup\:\:\$minecraft_version\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Services/MinecraftPackageInstaller.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitSetup\:\:\$software\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Services/MinecraftPackageInstaller.php
+
+		-
+			message: '#^Offset ''dependencies'' on array\{project\: array\<string, mixed\>, version\: array\<string, mixed\>, dependencies\: array\<int, array\<string, mixed\>\>, warning\: string\|null\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: src/Services/MinecraftPackageInstaller.php
+
+		-
+			message: '#^Offset ''sha1'' on array\{sha1\: string, sha256\: string, sha512\: string, size\: int, plugin_version\: string\|null, class_major_version\: int\|null\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: src/Services/MinecraftPackageInstaller.php
+
+		-
+			message: '#^Offset ''sha512'' on array\{sha1\: string, sha256\: string, sha512\: string, size\: int, plugin_version\: string\|null, class_major_version\: int\|null\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: src/Services/MinecraftPackageInstaller.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitPackage\:\:\$project_name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Services/MinecraftProfileService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitPackage\:\:\$source\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Services/MinecraftProfileService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitPackage\:\:\$source_project_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Services/MinecraftProfileService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitPackage\:\:\$update_pinned\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Services/MinecraftProfileService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitProfile\:\:\$packages_json\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Services/MinecraftProfileService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitProfile\:\:\$setup_json\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Services/MinecraftProfileService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitProfile\:\:\$software_json\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Services/MinecraftProfileService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitSetup\:\:\$difficulty\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Services/MinecraftProfileService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitSetup\:\:\$edition\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Services/MinecraftProfileService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitSetup\:\:\$gamemode\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Services/MinecraftProfileService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitSetup\:\:\$level_name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Services/MinecraftProfileService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitSetup\:\:\$loader\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Services/MinecraftProfileService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitSetup\:\:\$loader_version\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Services/MinecraftProfileService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitSetup\:\:\$max_players\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Services/MinecraftProfileService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitSetup\:\:\$minecraft_version\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Services/MinecraftProfileService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitSetup\:\:\$motd\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Services/MinecraftProfileService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitSetup\:\:\$online_mode\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Services/MinecraftProfileService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitSetup\:\:\$pvp\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Services/MinecraftProfileService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitSetup\:\:\$simulation_distance\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Services/MinecraftProfileService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitSetup\:\:\$software\.$#'
+			identifier: property.notFound
+			count: 2
+			path: src/Services/MinecraftProfileService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitSetup\:\:\$view_distance\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Services/MinecraftProfileService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitSetup\:\:\$whitelist\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Services/MinecraftProfileService.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitPackage\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: src/Services/MinecraftProfileService.php
+
+		-
+			message: '#^Call to function is_string\(\) with string will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: src/Services/MinecraftServerFileService.php
+
+		-
+			message: '#^Instanceof between ZipArchive and ZipArchive will always evaluate to true\.$#'
+			identifier: instanceof.alwaysTrue
+			count: 2
+			path: src/Services/MinecraftServerFileService.php
+
+		-
+			message: '#^Offset ''size'' on array\{name\: string, index\: int, crc\: int, size\: int, mtime\: int, comp_size\: int, comp_method\: int, encryption_method\: int\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: src/Services/MinecraftServerFileService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitSetup\:\:\$loader\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Services/MinecraftSetupService.php
+
+		-
+			message: '#^Ternary operator condition is always true\.$#'
+			identifier: ternary.alwaysTrue
+			count: 1
+			path: src/Services/MinecraftSetupService.php
+
+		-
+			message: '#^Call to function is_string\(\) with string will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 2
+			path: src/Services/MinecraftSoftwareService.php
+
+		-
+			message: '#^Offset 0 on array\<string, mixed\> on left side of \?\? does not exist\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: src/Services/MinecraftSoftwareService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitPackage\:\:\$dependencies_json\.$#'
+			identifier: property.notFound
+			count: 2
+			path: src/Services/MinecraftUpdateService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitPackage\:\:\$file_name\.$#'
+			identifier: property.notFound
+			count: 6
+			path: src/Services/MinecraftUpdateService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitPackage\:\:\$file_path\.$#'
+			identifier: property.notFound
+			count: 9
+			path: src/Services/MinecraftUpdateService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitPackage\:\:\$installed_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Services/MinecraftUpdateService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitPackage\:\:\$package_type\.$#'
+			identifier: property.notFound
+			count: 6
+			path: src/Services/MinecraftUpdateService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitPackage\:\:\$project_name\.$#'
+			identifier: property.notFound
+			count: 13
+			path: src/Services/MinecraftUpdateService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitPackage\:\:\$server_uuid\.$#'
+			identifier: property.notFound
+			count: 4
+			path: src/Services/MinecraftUpdateService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitPackage\:\:\$source\.$#'
+			identifier: property.notFound
+			count: 8
+			path: src/Services/MinecraftUpdateService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitPackage\:\:\$source_project_id\.$#'
+			identifier: property.notFound
+			count: 6
+			path: src/Services/MinecraftUpdateService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitPackage\:\:\$source_project_slug\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Services/MinecraftUpdateService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitPackage\:\:\$source_version_id\.$#'
+			identifier: property.notFound
+			count: 7
+			path: src/Services/MinecraftUpdateService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitPackage\:\:\$update_pinned\.$#'
+			identifier: property.notFound
+			count: 3
+			path: src/Services/MinecraftUpdateService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitPackage\:\:\$version_number\.$#'
+			identifier: property.notFound
+			count: 5
+			path: src/Services/MinecraftUpdateService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitSetup\:\:\$loader\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Services/MinecraftUpdateService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitSetup\:\:\$minecraft_version\.$#'
+			identifier: property.notFound
+			count: 4
+			path: src/Services/MinecraftUpdateService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitSetup\:\:\$software\.$#'
+			identifier: property.notFound
+			count: 3
+			path: src/Services/MinecraftUpdateService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitUpdateCheck\:\:\$candidate_json\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Services/MinecraftUpdateService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitUpdateCheck\:\:\$package_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Services/MinecraftUpdateService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitUpdateCheck\:\:\$status\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Services/MinecraftUpdateService.php
+
+		-
+			message: '#^Call to function is_string\(\) with non\-falsy\-string will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: src/Services/MinecraftUpdateService.php
+
+		-
+			message: '#^Offset ''file_name'' on array\{url\: string, source\: string, version_id\: string, file_name\: string, startup\: string\|null, installer\: bool, sha256\: string\|null\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: src/Services/MinecraftUpdateService.php
+
+		-
+			message: '#^Offset ''installer'' on array\{url\: string, source\: string, version_id\: string, file_name\: string, startup\: string\|null, installer\: bool, sha256\: string\|null\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 2
+			path: src/Services/MinecraftUpdateService.php
+
+		-
+			message: '#^Offset ''sha1'' on array\{sha1\: string, sha256\: string, sha512\: string, size\: int, plugin_version\: string\|null, class_major_version\: int\|null\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: src/Services/MinecraftUpdateService.php
+
+		-
+			message: '#^Offset ''sha512'' on array\{sha1\: string, sha256\: string, sha512\: string, size\: int, plugin_version\: string\|null, class_major_version\: int\|null\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: src/Services/MinecraftUpdateService.php
+
+		-
+			message: '#^Offset ''source'' on array\{url\: string, source\: string, version_id\: string, file_name\: string, startup\: string\|null, installer\: bool, sha256\: string\|null\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: src/Services/MinecraftUpdateService.php
+
+		-
+			message: '#^Offset ''url'' on array\{url\: string, source\: string, version_id\: string, file_name\: string, startup\: string\|null, installer\: bool, sha256\: string\|null\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: src/Services/MinecraftUpdateService.php
+
+		-
+			message: '#^Offset ''version_id'' on array\{url\: string, source\: string, version_id\: string, file_name\: string, startup\: string\|null, installer\: bool, sha256\: string\|null\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: src/Services/MinecraftUpdateService.php
+
+		-
+			message: '#^Strict comparison using \!\=\= between array\<string, mixed\> and null will always evaluate to true\.$#'
+			identifier: notIdentical.alwaysTrue
+			count: 2
+			path: src/Services/MinecraftUpdateService.php
+
+		-
+			message: '#^Strict comparison using \=\=\= between non\-empty\-list\<non\-falsy\-string\> and array\{\} will always evaluate to false\.$#'
+			identifier: identical.alwaysFalse
+			count: 1
+			path: src/Services/MinecraftUpdateService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitPackage\:\:\$file_path\.$#'
+			identifier: property.notFound
+			count: 2
+			path: src/Services/MinecraftVersionChangeService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitPackage\:\:\$project_name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Services/MinecraftVersionChangeService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitSetup\:\:\$loader\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Services/MinecraftVersionChangeService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitSetup\:\:\$loader_version\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Services/MinecraftVersionChangeService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitSetup\:\:\$minecraft_version\.$#'
+			identifier: property.notFound
+			count: 2
+			path: src/Services/MinecraftVersionChangeService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitSetup\:\:\$software\.$#'
+			identifier: property.notFound
+			count: 3
+			path: src/Services/MinecraftVersionChangeService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitSetup\:\:\$minecraft_version\.$#'
+			identifier: property.notFound
+			count: 3
+			path: src/Services/ModrinthService.php
+
+		-
+			message: '#^Access to an undefined property BlueWolf\\MinecraftToolkit\\Models\\MinecraftToolkitSetup\:\:\$software\.$#'
+			identifier: property.notFound
+			count: 5
+			path: src/Services/ModrinthService.php
+
+		-
+			message: '#^Method BlueWolf\\MinecraftToolkit\\Services\\ModrinthService\:\:versions\(\) should return array\<int, array\<string, mixed\>\> but returns array\<string, mixed\>\.$#'
+			identifier: return.type
+			count: 1
+			path: src/Services/ModrinthService.php

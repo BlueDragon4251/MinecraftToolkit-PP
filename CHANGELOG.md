@@ -6,6 +6,25 @@ Released versions are immutable. Every new change is documented under a new vers
 
 This project is source-available, not open source. See [`LICENSE`](./LICENSE) for usage rights.
 
+## [1.3.7] - 2026-08-21
+
+### Added
+
+- Added a persistent setup-operation workflow that resumes through the Laravel queue and scheduler after Panel or Wings interruptions.
+- Added mandatory locked Pelican/Wings full-server safety backups before setup changes any server that already contains files.
+- Added explicit setup safety confirmation, live setup-stage reporting, backup identifiers, database notifications, and a configurable two-hour backup timeout.
+
+### Changed
+
+- Changed setup uploads to be staged privately on the Panel host so icons and custom Modpacks remain available to the background worker.
+- Changed setup JAR, ZIP, EULA, properties, icon, and restore writes to use verified atomic replacement with automatic targeted restore attempts on failure.
+- Changed existing-server setup to stop safely when no backup slot, backup host, successful backup result, or verified checksum is available; successful safety backups remain locked.
+
+### Fixed
+
+- Fixed partial setup state after simultaneous node outages by persisting every operation stage and recovering queued, backup-pending, and interrupted installation work.
+- Fixed the setup review step silently accepting overwrite risk through a hidden always-true field.
+
 ## [1.3.6] - 2026-08-18
 
 ### Added
