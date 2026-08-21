@@ -65,16 +65,19 @@ class MinecraftServerFileService
 
     public function pullJar(Server $server, string $url, string $fileName = 'server.jar'): void
     {
-        $this->assertFileName($fileName, ['jar']);
-        $this->downloadJar($server, $url, '/'.$fileName);
+        $this->pullFile($server, $url, $fileName, ['jar']);
     }
 
     /** @param string[] $allowedExtensions */
     public function pullFile(Server $server, string $url, string $fileName, array $allowedExtensions = ['jar']): void
     {
         $this->assertFileName($fileName, $allowedExtensions);
-        $download = $this->downloadContents($url, $allowedExtensions);
-        $this->writeAtomically($server, '/'.$fileName, $download['contents']);
+        $this->assertDownloadUrl($url);
+
+        $this->repository($server)->pull($url, '/', [
+            'filename' => $fileName,
+            'foreground' => true,
+        ])->throw();
     }
 
     /** @param string[] $allowedExtensions */
@@ -436,13 +439,6 @@ class MinecraftServerFileService
             } catch (\Throwable) {
             }
 
-            try {
-                if ($backup !== null && ! $this->exists($server, $path) && $this->exists($server, $backup)) {
-                    $this->move($server, $backup, $path);
-                }
-            } catch (\Throwable) {
-            }
-
             throw $exception;
         }
     }
@@ -463,18 +459,7 @@ class MinecraftServerFileService
         }
 
         $currentBackup = $this->backupIfPresent($server, $targetPath);
-        try {
-            $this->writeAtomically($server, $targetPath, $contents);
-        } catch (\Throwable $exception) {
-            try {
-                if ($currentBackup !== null && ! $this->exists($server, $targetPath) && $this->exists($server, $currentBackup)) {
-                    $this->move($server, $currentBackup, $targetPath);
-                }
-            } catch (\Throwable) {
-            }
-
-            throw $exception;
-        }
+        $this->write($server, $targetPath, $contents);
 
         return $currentBackup;
     }

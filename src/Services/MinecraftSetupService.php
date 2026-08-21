@@ -27,7 +27,7 @@ class MinecraftSetupService
     ) {}
 
     /** @param array<string, mixed> $data */
-    public function setup(Server $server, array $data, mixed $icon = null, ?int $userId = null): MinecraftToolkitSetup
+    public function setup(Server $server, array $data, mixed $icon = null): MinecraftToolkitSetup
     {
         /** @var Lock $lock */
         $lock = Cache::lock("minecrafttoolkit.setup.{$server->uuid}", 600);
@@ -36,14 +36,14 @@ class MinecraftSetupService
         }
 
         try {
-            return $this->performSetup($server, $data, $icon, $userId);
+            return $this->performSetup($server, $data, $icon);
         } finally {
             $lock->release();
         }
     }
 
     /** @param array<string, mixed> $data */
-    private function performSetup(Server $server, array $data, mixed $icon, ?int $userId): MinecraftToolkitSetup
+    private function performSetup(Server $server, array $data, mixed $icon): MinecraftToolkitSetup
     {
         if (! $server->allocation) {
             throw new MinecraftToolkitException(
@@ -61,7 +61,7 @@ class MinecraftSetupService
 
         $setup = MinecraftToolkitSetup::query()->updateOrCreate(
             ['server_uuid' => $server->uuid],
-            $this->setupAttributes($server, $data, $userId) + [
+            $this->setupAttributes($server, $data) + [
                 'setup_status' => 'installing',
                 'setup_started_at' => now(),
                 'setup_completed_at' => null,
@@ -72,9 +72,19 @@ class MinecraftSetupService
 
         try {
             $isBedrock = (string) $data['software'] === 'bedrock';
+            if ((bool) config('minecrafttoolkit.backup_before_overwrite', true)) {
+                $this->files->backupIfPresent($server, '/server.jar');
+                $this->files->backupIfPresent($server, '/server.properties');
+                $this->files->backupIfPresent($server, '/server-icon.png');
+                $this->files->backupIfPresent($server, '/bedrock-server.zip');
+                if ($download['file_name'] !== 'server.jar' && $download['file_name'] !== 'bedrock-server.zip') {
+                    $this->files->backupIfPresent($server, '/'.$download['file_name']);
+                }
+            }
+
             if ($isBedrock) {
                 $this->files->downloadFile($server, $download['url'], $download['file_name'], ['zip']);
-                $this->files->writeAtomically(
+                $this->files->write(
                     $server,
                     '/server.properties',
                     $this->properties->generateBedrock($data, (int) $server->allocation->port)
@@ -88,10 +98,10 @@ class MinecraftSetupService
                         ['sha256' => $download['sha256']]
                     );
                 } else {
-                    $this->files->downloadJar($server, $download['url'], '/'.$download['file_name']);
+                    $this->files->pullJar($server, $download['url'], $download['file_name']);
                 }
-                $this->files->writeAtomically($server, '/eula.txt', "eula=true\n");
-                $this->files->writeAtomically(
+                $this->files->write($server, '/eula.txt', "eula=true\n");
+                $this->files->write(
                     $server,
                     '/server.properties',
                     $this->properties->generateJava($data, (int) $server->allocation->port)
@@ -141,7 +151,7 @@ class MinecraftSetupService
                     'is_system_package' => true,
                     'managed' => true,
                     'enabled' => true,
-                    'installed_by' => $userId ?? user()?->id,
+                    'installed_by' => user()?->id,
                     'installed_at' => now(),
                 ]
             );
@@ -191,11 +201,11 @@ class MinecraftSetupService
     }
 
     /** @param array<string, mixed> $data */
-    private function setupAttributes(Server $server, array $data, ?int $userId): array
+    private function setupAttributes(Server $server, array $data): array
     {
         return [
             'server_id' => $server->id,
-            'user_id' => $userId ?? user()?->id,
+            'user_id' => user()?->id,
             'edition' => $data['software'] === 'bedrock' ? 'bedrock' : 'java',
             'software' => $data['software'],
             'minecraft_version' => $data['minecraft_version'],
@@ -269,9 +279,7 @@ class MinecraftSetupService
             return false;
         }
 
-        $contents = is_string($icon) && is_file($icon)
-            ? file_get_contents($icon)
-            : (method_exists($icon, 'getContent') ? $icon->getContent() : null);
+        $contents = method_exists($icon, 'getContent') ? $icon->getContent() : null;
         if (! is_string($contents) || $contents === '') {
             throw new MinecraftToolkitException('Das Server-Icon konnte nicht gelesen werden.');
         }
@@ -290,7 +298,7 @@ class MinecraftSetupService
             throw new MinecraftToolkitException('Das Server-Icon muss eine 64x64 Pixel große PNG-Datei sein.');
         }
 
-        $this->files->writeAtomically($server, '/server-icon.png', $contents);
+        $this->files->write($server, '/server-icon.png', $contents);
 
         return true;
     }

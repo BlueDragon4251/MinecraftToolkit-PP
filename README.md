@@ -6,7 +6,7 @@ Minecraft Toolkit is a Pelican Panel plugin for setting up and managing Minecraf
 
 See [`CHANGELOG.md`](./CHANGELOG.md) for version history and notable changes.
 
-Current version: `1.3.7`.
+Current version: `1.3.6`.
 
 ## License and usage rights
 
@@ -55,9 +55,8 @@ All server files are accessed through Pelican's Wings API. The plugin does not r
 - A stopped server for setup, package installation, updates, or configuration changes
 - Permission to edit server files
 - Permission to change the startup command when installing Fabric, Forge, NeoForge, or Vanilla Bedrock
-- For servers that already contain files: a free Pelican backup slot and a configured, reachable backup host
 
-A queue worker and Laravel scheduler are required for safe setup execution and recovery, scheduled metadata warming, automatic update checks, and post-update health verification. Installer, updater, management, and manual checks remain usable without scheduled execution.
+A queue worker and Laravel scheduler are required for scheduled metadata warming, automatic update checks, and post-update health verification. Manual setup, installs, updates, and checks remain usable without scheduled execution.
 
 Recommended production processes:
 
@@ -99,11 +98,9 @@ The directory name must remain `minecrafttoolkit`, because it must match the plu
 8. Optionally upload a 64x64 PNG server icon.
 9. For Paper or Purpur, optionally enable crossplay and select a Bedrock allocation. Folia intentionally does not expose the crossplay switch because Paper plugin compatibility is not guaranteed.
 10. Optionally select multiple compatible plugins or mods that should be installed directly after setup. You can switch between Modrinth and CurseForge without losing the previous selections, so mixed-provider setups are supported.
-11. Confirm the safety notice, review the setup, and start it.
+11. Review the setup and start it.
 
-Setup is persisted and processed by the Laravel queue. If the server contains any existing file or directory outside `/.minecraft-toolkit`, Minecraft Toolkit first creates a complete Pelican/Wings backup, requires a successful completion with checksum, and keeps that backup locked. Setup does not mutate server files when the backup cannot be created or verified. The scheduler resumes interrupted operations after Panel or node outages.
-
-Individual target replacements are also written atomically. Replaced target files are moved to:
+Existing target files are moved to:
 
 ```text
 /.minecraft-toolkit/backups/YYYY-MM-DD-HH-mm-ss/

@@ -4,17 +4,13 @@ declare(strict_types=1);
 
 namespace BlueWolf\MinecraftToolkit\Providers;
 
-use App\Events\Server\BackupCompleted;
 use App\Models\Subuser;
 use BlueWolf\MinecraftToolkit\Console\Commands\CheckMinecraftToolkitTranslationsCommand;
 use BlueWolf\MinecraftToolkit\Console\Commands\WarmMinecraftToolkitCacheCommand;
 use BlueWolf\MinecraftToolkit\Jobs\CheckMinecraftToolkitUpdatesJob;
-use BlueWolf\MinecraftToolkit\Jobs\RecoverMinecraftSetupOperationsJob;
-use BlueWolf\MinecraftToolkit\Jobs\RunMinecraftSetupOperationJob;
 use BlueWolf\MinecraftToolkit\Jobs\StartMinecraftPostUpdateVerificationJob;
 use BlueWolf\MinecraftToolkit\Livewire\BlueItAnnouncements;
 use BlueWolf\MinecraftToolkit\Models\MinecraftToolkitPackage;
-use BlueWolf\MinecraftToolkit\Models\MinecraftToolkitSetupOperation;
 use BlueWolf\MinecraftToolkit\Services\BlueItAnnouncementService;
 use BlueWolf\MinecraftToolkit\Services\CurseForgeApiKeyProvider;
 use BlueWolf\MinecraftToolkit\Services\CurseForgeService;
@@ -31,7 +27,6 @@ use BlueWolf\MinecraftToolkit\Services\MinecraftProfileService;
 use BlueWolf\MinecraftToolkit\Services\MinecraftPropertiesService;
 use BlueWolf\MinecraftToolkit\Services\MinecraftServerFileService;
 use BlueWolf\MinecraftToolkit\Services\MinecraftServerStateService;
-use BlueWolf\MinecraftToolkit\Services\MinecraftSetupOperationService;
 use BlueWolf\MinecraftToolkit\Services\MinecraftSetupService;
 use BlueWolf\MinecraftToolkit\Services\MinecraftSoftwareService;
 use BlueWolf\MinecraftToolkit\Services\MinecraftUpdateService;
@@ -42,9 +37,7 @@ use Filament\Support\Facades\FilamentView;
 use Filament\View\PanelsRenderHook;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\Facades\Blade;
-use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Lang;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\ServiceProvider;
 use Livewire\Livewire;
 
@@ -72,7 +65,6 @@ class MinecraftToolkitPluginProvider extends ServiceProvider
         $this->app->singleton(MinecraftServerFileService::class);
         $this->app->singleton(MinecraftServerStateService::class);
         $this->app->singleton(MinecraftSetupService::class);
-        $this->app->singleton(MinecraftSetupOperationService::class);
         $this->app->singleton(BlueItAnnouncementService::class);
 
         Subuser::registerCustomPermissions(
@@ -109,23 +101,7 @@ class MinecraftToolkitPluginProvider extends ServiceProvider
             }
         });
 
-        Event::listen(BackupCompleted::class, function (BackupCompleted $event): void {
-            if (! Schema::hasTable('minecraft_toolkit_setup_operations')) {
-                return;
-            }
-
-            MinecraftToolkitSetupOperation::query()
-                ->where('backup_id', $event->backup->id)
-                ->where('status', 'backup_pending')
-                ->get(['id'])
-                ->each(fn (MinecraftToolkitSetupOperation $operation) => RunMinecraftSetupOperationJob::dispatch($operation->id));
-        });
-
         $this->app->afterResolving(Schedule::class, function (Schedule $schedule): void {
-            $schedule->job(new RecoverMinecraftSetupOperationsJob)
-                ->everyMinute()
-                ->name('minecraft-toolkit:recover-setups')
-                ->withoutOverlapping();
             if ((bool) config('minecrafttoolkit.scheduled_update_checks', true)) {
                 $schedule->job(new CheckMinecraftToolkitUpdatesJob)->dailyAt('04:00')->name('minecraft-toolkit:update-checks')->withoutOverlapping();
                 $schedule->command('minecraft-toolkit:warm-cache')->dailyAt('03:30')->name('minecraft-toolkit:warm-cache')->withoutOverlapping();

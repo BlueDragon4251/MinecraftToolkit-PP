@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 return [
     'minecrafttoolkit_title' => 'Minecraft Toolkit',
     'minecrafttoolkit_desc' => 'Steuert den Zugriff auf Minecraft-Toolkit-Erweiterungen.',
