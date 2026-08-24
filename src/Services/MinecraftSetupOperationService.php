@@ -100,9 +100,23 @@ class MinecraftSetupOperationService
                 : 'waiting';
         }
 
-        return $backup->is_successful && is_string($backup->checksum) && $backup->checksum !== ''
+        return $backup->is_successful
+            && is_string($backup->checksum)
+            && $backup->checksum !== ''
+            && (int) $backup->bytes > 0
             ? 'verified'
             : 'failed';
+    }
+
+    public function localBackupDirectory(MinecraftToolkitSetupOperation $operation): string
+    {
+        $timestamp = ($operation->started_at ?? $operation->created_at ?? now())->format('Y-m-d-H-i-s');
+        $operationSuffix = substr(str_replace('-', '', strtolower($operation->uuid)), 0, 8);
+        if (! preg_match('/^[0-9a-f]{8}$/', $operationSuffix)) {
+            throw new MinecraftToolkitException('Invalid setup operation identifier.');
+        }
+
+        return '/.minecraft-toolkit/backups/'.$timestamp.'-'.$operationSuffix;
     }
 
     public function stagedPath(MinecraftToolkitSetupOperation $operation, ?string $file): ?string

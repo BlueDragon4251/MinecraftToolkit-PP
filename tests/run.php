@@ -18,8 +18,10 @@ require_once __DIR__.'/FakeMinecraftFileRepository.php';
 use App\Models\Backup;
 use App\Models\Server;
 use BlueWolf\MinecraftToolkit\Exceptions\MinecraftToolkitException;
+use BlueWolf\MinecraftToolkit\Filament\Server\Pages\MinecraftUpdaterPage;
 use BlueWolf\MinecraftToolkit\Models\MinecraftToolkitPackage;
 use BlueWolf\MinecraftToolkit\Models\MinecraftToolkitSetup;
+use BlueWolf\MinecraftToolkit\Models\MinecraftToolkitSetupOperation;
 use BlueWolf\MinecraftToolkit\Services\CurseForgeApiKeyProvider;
 use BlueWolf\MinecraftToolkit\Services\CurseForgeService;
 use BlueWolf\MinecraftToolkit\Services\GeyserDownloadService;
@@ -27,6 +29,7 @@ use BlueWolf\MinecraftToolkit\Services\MinecraftCompatibilityService;
 use BlueWolf\MinecraftToolkit\Services\MinecraftCrossplayService;
 use BlueWolf\MinecraftToolkit\Services\MinecraftModpackService;
 use BlueWolf\MinecraftToolkit\Services\MinecraftPackageInstaller;
+use BlueWolf\MinecraftToolkit\Services\MinecraftPackageVersionNormalizer;
 use BlueWolf\MinecraftToolkit\Services\MinecraftPropertiesService;
 use BlueWolf\MinecraftToolkit\Services\MinecraftServerFileService;
 use BlueWolf\MinecraftToolkit\Services\MinecraftSetupOperationService;
@@ -34,7 +37,11 @@ use BlueWolf\MinecraftToolkit\Services\MinecraftSoftwareService;
 use BlueWolf\MinecraftToolkit\Services\MinecraftUpdateService;
 use BlueWolf\MinecraftToolkit\Services\ModrinthService;
 use BlueWolf\MinecraftToolkit\Tests\FakeMinecraftFileRepository;
+use GuzzleHttp\Psr7\Response;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Carbon;
+use Illuminate\Translation\ArrayLoader;
+use Illuminate\Translation\Translator;
 
 $tests = [];
 
@@ -96,8 +103,148 @@ $tests['setup safety backup verification states'] = function (): void {
     $failed = $backup(['created_at' => $now, 'completed_at' => $now, 'is_successful' => false, 'checksum' => null]);
     assertSame('failed', $service->safetyBackupState($failed, $now, 120));
 
-    $verified = $backup(['created_at' => $now, 'completed_at' => $now, 'is_successful' => true, 'checksum' => 'sha256:example']);
+    $empty = $backup(['created_at' => $now, 'completed_at' => $now, 'is_successful' => true, 'checksum' => 'sha256:example', 'bytes' => 0]);
+    assertSame('failed', $service->safetyBackupState($empty, $now, 120));
+
+    $verified = $backup(['created_at' => $now, 'completed_at' => $now, 'is_successful' => true, 'checksum' => 'sha256:example', 'bytes' => 1024]);
     assertSame('verified', $service->safetyBackupState($verified, $now, 120));
+};
+
+$tests['setup operation uses one deterministic local backup directory'] = function (): void {
+    $service = new MinecraftSetupOperationService;
+    $operation = new class extends MinecraftToolkitSetupOperation
+    {
+        public function getDateFormat(): string
+        {
+            return 'Y-m-d H:i:s';
+        }
+    };
+    $operation->forceFill([
+        'uuid' => '12345678-1234-4123-8123-123456789abc',
+        'started_at' => Carbon::parse('2026-08-21 12:34:56'),
+    ]);
+
+    assertSame('/.minecraft-toolkit/backups/2026-08-21-12-34-56-12345678', $service->localBackupDirectory($operation));
+};
+
+$tests['setup wizard and worker continuation regressions'] = function (): void {
+    $page = (string) file_get_contents(dirname(__DIR__).'/src/Filament/Server/Pages/MinecraftSetupPage.php');
+    assertContains("persistStepInQueryString('minecraft-setup-step')", $page);
+    assertContains("->key('minecraft-setup-wizard')", $page);
+    assertContains("Step::make('packages')\n                    ->key('packages')", $page);
+    assertContains('public static function shouldRegisterNavigation(): bool', $page);
+    assertContains('public function hydrate(): void', $page);
+    assertContains('synchronizeSelectedSetupPackageIds', $page);
+    if (! preg_match('/private function renderSetupPackageBrowser\(Get \$get\): string(?<body>.*?)\n    }/s', $page, $matches)) {
+        throw new RuntimeException('Setup package browser render method was not found.');
+    }
+    if (str_contains($matches['body'], '$this->data[')) {
+        throw new RuntimeException('Setup package browser must not mutate form state while rendering.');
+    }
+
+    $job = (string) file_get_contents(dirname(__DIR__).'/src/Jobs/RunMinecraftSetupOperationJob.php');
+    assertContains('ShouldBeUniqueUntilProcessing', $job);
+    assertContains('$this->scheduleContinuation();', $job);
+    assertContains("['core_setup_completed', 'modpack_completed']", $job);
+};
+
+$tests['Wings missing package directory regression'] = function (): void {
+    $files = new MinecraftServerFileService;
+    $response = new Illuminate\Http\Client\Response(new Response(404));
+    $exception = new RequestException($response);
+    $method = new ReflectionMethod(MinecraftServerFileService::class, 'isMissingPathException');
+
+    assertSame(true, $method->invoke($files, $exception));
+
+    $installer = (string) file_get_contents(dirname(__DIR__).'/src/Services/MinecraftPackageInstaller.php');
+    $mkdirPosition = strpos($installer, '$this->files->makeDirectory($server, "/$targetDirectory");');
+    $existsPosition = strpos($installer, 'if ($this->files->exists($server, $path))');
+    if ($mkdirPosition === false || $existsPosition === false || $mkdirPosition >= $existsPosition) {
+        throw new RuntimeException('The package target directory must be created before the conflict check.');
+    }
+
+    $setupService = (string) file_get_contents(dirname(__DIR__).'/src/Services/MinecraftSetupService.php');
+    assertContains('Ausgewählte Pakete konnten nicht installiert werden:', $setupService);
+    assertContains('installModrinthPackage($server, $setup, $projectId, true)', $setupService);
+};
+
+$tests['setup package retry adopts only checksum-matching files'] = function (): void {
+    assertSame('5.5.71', MinecraftPackageVersionNormalizer::base('5.5.71'));
+    assertSame('5.5.71', MinecraftPackageVersionNormalizer::base('v5.5.71-bukkit'));
+    assertSame('5.5.71', MinecraftPackageVersionNormalizer::base('PAPER-v5.5.71'));
+    assertSame(true, MinecraftPackageVersionNormalizer::equivalent('5.5.71', 'v5.5.71-bukkit'));
+
+    $fileService = new MinecraftServerFileService;
+    $contents = 'verified package bytes';
+    invokePrivate($fileService, 'assertExpectedHashes', [
+        $contents,
+        ['sha512' => hash('sha512', $contents)],
+    ]);
+
+    try {
+        invokePrivate($fileService, 'assertExpectedHashes', [
+            $contents,
+            ['sha512' => str_repeat('0', 128)],
+        ]);
+        throw new RuntimeException('A mismatching source checksum was accepted.');
+    } catch (MinecraftToolkitException $exception) {
+        assertContains('SHA-512', $exception->getMessage());
+    }
+
+    $installerSource = (string) file_get_contents(dirname(__DIR__).'/src/Services/MinecraftPackageInstaller.php');
+    assertContains('inspectExistingJarWithMetadata($server, $path, $hashes)', $installerSource);
+    assertContains('if (! $allowAlreadyInstalled)', $installerSource);
+
+    $updaterSource = (string) file_get_contents(dirname(__DIR__).'/src/Services/MinecraftUpdateService.php');
+    assertContains('MinecraftPackageVersionNormalizer::equivalent($a, $b)', $updaterSource);
+    assertContains('function (array $downloadedMetadata) use ($package, $candidate): void', $updaterSource);
+};
+
+$tests['server software health reaches 100 and uses traffic-light colors'] = function (): void {
+    if (! app()->bound('translator')) {
+        app()->instance('translator', new Translator(
+            new ArrayLoader,
+            'en'
+        ));
+    }
+
+    $reflection = new ReflectionClass(MinecraftUpdaterPage::class);
+    $page = $reflection->newInstanceWithoutConstructor();
+
+    $verifiedServer = new MinecraftToolkitPackage;
+    $verifiedServer->forceFill([
+        'source' => 'paper',
+        'sha512' => str_repeat('a', 128),
+        'dependencies_json' => ['sha256' => str_repeat('b', 64)],
+        'update_pinned' => true,
+    ]);
+    $healthy = invokePrivate($page, 'packageHealth', [$verifiedServer, null, true]);
+    assertSame(100, $healthy['score']);
+    assertSame('success', $healthy['color']);
+
+    $unknown = new MinecraftToolkitPackage;
+    $unknown->forceFill([
+        'source' => 'unknown',
+        'sha512' => null,
+        'sha1' => null,
+        'dependencies_json' => null,
+        'update_pinned' => false,
+    ]);
+    $attention = invokePrivate($page, 'packageHealth', [$unknown, null, false]);
+    assertSame(55, $attention['score']);
+    assertSame('danger', $attention['color']);
+
+    $fileMetadata = (new MinecraftServerFileService)->inspectFileContents('server archive');
+    assertSame(hash('sha512', 'server archive'), $fileMetadata['sha512']);
+
+    $updaterView = (string) file_get_contents(dirname(__DIR__).'/resources/views/filament/server/pages/minecraft-updater.blade.php');
+    assertContains('<x-filament::badge :color="$package[\'health\'][\'color\']"', $updaterView);
+};
+
+$tests['modpacks navigation is limited to modded servers'] = function (): void {
+    $page = (string) file_get_contents(dirname(__DIR__).'/src/Filament/Server/Pages/MinecraftModpacksPage.php');
+    assertContains("->whereIn('software', ['fabric', 'forge', 'neoforge'])", $page);
+    assertContains('public static function shouldRegisterNavigation(): bool', $page);
 };
 
 $tests['source response fixtures'] = function (): void {

@@ -132,7 +132,10 @@ class MinecraftUpdateService
                     $server,
                     $candidate['url'],
                     $newPath,
-                    $candidate['hashes']
+                    $candidate['hashes'],
+                    function (array $downloadedMetadata) use ($package, $candidate): void {
+                        $this->assertDownloadedPackageMatchesCandidate($package, $candidate, $downloadedMetadata);
+                    }
                 );
                 if (! $this->files->exists($server, $newPath)) {
                     throw new MinecraftToolkitException('Das Update wurde vom Dateisystem nicht bestätigt. Die neue Datei wurde nicht gefunden.');
@@ -140,7 +143,6 @@ class MinecraftUpdateService
                 if ($newPath !== $oldPath && $this->files->exists($server, $oldPath)) {
                     throw new MinecraftToolkitException('Die alte Paketdatei ist nach dem Update noch vorhanden. Das Update wurde zur Sicherheit abgebrochen.');
                 }
-                $this->assertDownloadedPackageMatchesCandidate($package, $candidate, $metadata);
             } catch (\Throwable $exception) {
                 if ($backup !== null) {
                     try {
@@ -319,51 +321,47 @@ class MinecraftUpdateService
             return ['status' => 'error', 'message' => $message, 'metadata' => []];
         }
 
-        if (! $this->isJarPackage($package)) {
-            $metadata = [
-                'file_path' => $package->file_path,
-                'file_name' => $package->file_name,
-                'package_type' => $package->package_type,
-            ];
-            $message = 'Datei vorhanden. Für diese verwaltete Datei ist keine JAR-Metadatenprüfung nötig.';
-            $this->storeCheck($package, 'verified', $message);
-            $this->log($server, 'package_verified', 'success', $message, [
-                'package_id' => $package->id,
-                'file_path' => $package->file_path,
-                'package_type' => $package->package_type,
-            ]);
-
-            return ['status' => 'verified', 'message' => $message, 'metadata' => $metadata];
-        }
-
         try {
             $contents = $this->files->read(
                 $server,
                 $package->file_path,
                 max(1, (int) config('minecrafttoolkit.max_package_bytes', 104857600)) + 1
             );
-            $metadata = $this->files->inspectJarContents($contents);
+            $isJarPackage = $this->isJarPackage($package);
+            $metadata = $isJarPackage
+                ? $this->files->inspectJarContents($contents)
+                : $this->files->inspectFileContents($contents);
             $this->assertStoredPackageHashesMatch($package, $metadata);
 
-            if ($package->source !== 'geysermc') {
+            if ($isJarPackage && $package->source !== 'geysermc') {
                 $this->assertDownloadedPackageMatchesCandidate($package, [
                     'version_number' => (string) ($package->version_number ?? ''),
                 ], $metadata);
             }
 
-            $message = sprintf(
-                'Datei verifiziert. SHA-512: %s, Größe: %d Bytes.',
-                substr((string) $metadata['sha512'], 0, 16).'...',
-                (int) $metadata['size']
-            );
+            $package->forceFill([
+                'sha1' => $metadata['sha1'],
+                'sha512' => $metadata['sha512'],
+            ])->save();
+
+            $message = $isJarPackage
+                ? sprintf(
+                    'Datei verifiziert. SHA-512: %s, Größe: %d Bytes.',
+                    substr((string) $metadata['sha512'], 0, 16).'...',
+                    (int) $metadata['size']
+                )
+                : sprintf(
+                    'Datei vorhanden und per SHA-512 verifiziert. Größe: %d Bytes.',
+                    (int) $metadata['size']
+                );
             $this->storeCheck($package, 'verified', $message);
             $this->log($server, 'package_verified', 'success', $message, [
                 'package_id' => $package->id,
                 'sha1' => $metadata['sha1'],
                 'sha512' => $metadata['sha512'],
                 'size' => $metadata['size'],
-                'plugin_version' => $metadata['plugin_version'],
-                'class_major_version' => $metadata['class_major_version'],
+                'plugin_version' => $metadata['plugin_version'] ?? null,
+                'class_major_version' => $metadata['class_major_version'] ?? null,
             ]);
 
             return ['status' => 'verified', 'message' => $message, 'metadata' => $metadata];
@@ -1117,13 +1115,7 @@ class MinecraftUpdateService
 
     private function versionsEquivalent(string $a, string $b): bool
     {
-        $a = trim($a);
-        $b = trim($b);
-        if ($a === $b) {
-            return true;
-        }
-
-        return $this->versionBase($a) === $this->versionBase($b);
+        return MinecraftPackageVersionNormalizer::equivalent($a, $b);
     }
 
     /** @param array<string, mixed> $candidate */
@@ -1161,17 +1153,6 @@ class MinecraftUpdateService
     {
         return strtolower(pathinfo((string) $package->file_name, PATHINFO_EXTENSION)) === 'jar'
             || strtolower(pathinfo((string) $package->file_path, PATHINFO_EXTENSION)) === 'jar';
-    }
-
-    private function versionBase(string $version): string
-    {
-        $version = trim($version);
-        $version = preg_replace('/^v/i', '', $version) ?? $version;
-        $version = preg_replace('/\+.*$/', '', $version) ?? $version;
-        $version = preg_replace('/-SNAPSHOT.*$/', '', $version) ?? $version;
-        $version = preg_replace('/^(?:bukkit|spigot|paper|fabric|forge|neoforge)-/i', '', $version) ?? $version;
-
-        return trim($version);
     }
 
     private function readLatestLog(Server $server): string

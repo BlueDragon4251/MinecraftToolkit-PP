@@ -6,7 +6,7 @@ Released versions are immutable. Every new change is documented under a new vers
 
 This project is source-available, not open source. See [`LICENSE`](./LICENSE) for usage rights.
 
-## [1.3.7] - 2026-08-21
+## [1.3.8] - 2026-08-24
 
 ### Added
 
@@ -24,6 +24,25 @@ This project is source-available, not open source. See [`LICENSE`](./LICENSE) fo
 
 - Fixed partial setup state after simultaneous node outages by persisting every operation stage and recovering queued, backup-pending, and interrupted installation work.
 - Fixed the setup review step silently accepting overwrite risk through a hidden always-true field.
+- Fixed Modrinth, CurseForge, search, selection, and pagination actions jumping from the Plugins/Mods step back to Server Software by persisting the active Filament wizard step.
+- Fixed package-browser Livewire actions rebuilding the wizard from the first step by removing form-state mutations during rendering and assigning stable wizard and step keys.
+- Fixed fresh `/plugins` and `/mods` directories being treated as fatal Wings 404 errors before selected Modrinth or CurseForge packages could be downloaded.
+- Fixed failed selected Mods/Plugins being reported as a completed setup; package failures now fail the operation and retries reuse packages that were already installed successfully.
+- Fixed valid platform-qualified source versions such as Modrinth's `v5.5.71-bukkit` being rejected when the verified JAR declares the equivalent base version `5.5.71`.
+- Fixed the updater and manual package verification still using an older version comparison than the setup installer, which incorrectly kept verified packages such as LuckPerms in a failed-health state.
+- Fixed rapid setup package selections allowing the custom browser state and Filament's hidden form state to diverge between Livewire requests; the complete selection is now synchronized before it is queued.
+- Fixed interrupted setup retries getting stuck on a JAR that was atomically written before its managed database row was committed; checksum-matching source files are now verified and safely adopted, while unknown or mismatching collisions remain untouched.
+- Fixed backup-pending setup operations relying solely on a backup event or the scheduler to continue; the unique worker now schedules its own verified continuation while the scheduler remains the outage recovery path.
+- Fixed setup and operation records becoming visible as completed at different times, which could redirect to an unavailable page and display Filament's generic page-loading error.
+- Fixed the completed setup page denying the worker-status poll before it could redirect to the Toolkit overview, which displayed Filament's generic page-loading error after completion.
+- Fixed interrupted Modpack retries rerunning the completed core setup stage.
+- Fixed one setup attempt scattering replaced target files across multiple timestamp backup directories; replacements now share one deterministic directory and retries never overwrite the original copies.
+- Fixed successful zero-byte safety backups being accepted as verified.
+- Documented that the Panel queue worker, scheduler, and Artisan maintenance commands must use the PHP-FPM operating-system user to prevent shared Laravel file-cache ownership from causing Panel-wide HTTP 500 responses.
+- Removed Minecraft Modpacks from the sidebar and denied the page on plugin, Vanilla, and Bedrock servers; it is now shown only for completed Fabric, Forge, and NeoForge setups.
+- Fixed healthy server software being unable to reach 100/100 because official Minecraft sources and stored SHA-256 metadata were not included in the score and a later update check hid an earlier successful file verification.
+- Changed health scores to prominent green, yellow, and red badges; pinning a package is now treated as an update policy instead of a health penalty.
+- Changed new server artifacts and successful legacy verification runs to persist their calculated SHA-1/SHA-512 integrity baseline, including non-JAR server archives.
 
 ## [1.3.6] - 2026-08-18
 

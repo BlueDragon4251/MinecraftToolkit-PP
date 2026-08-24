@@ -379,6 +379,7 @@ return [
         'health_trusted_source' => 'vertrauenswuerdige Quelle',
         'health_known_source' => 'bekannte Quelle',
         'health_sha512' => 'SHA-512 gespeichert',
+        'health_sha256' => 'SHA-256 gespeichert',
         'health_sha1' => 'SHA-1 gespeichert',
         'health_no_hash' => 'kein gespeicherter Hash',
         'health_pinned' => 'gepinnt',

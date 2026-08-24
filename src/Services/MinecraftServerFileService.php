@@ -9,12 +9,16 @@ use App\Models\Server;
 use App\Repositories\Daemon\DaemonFileRepository;
 use BlueWolf\MinecraftToolkit\Exceptions\MinecraftToolkitException;
 use Illuminate\Contracts\Filesystem\FileNotFoundException;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Http;
 
 class MinecraftServerFileService
 {
+    /** @var array<string, string> */
+    private array $backupDirectories = [];
+
     public function write(Server $server, string $path, string $contents): void
     {
         $this->repository($server)->putContent($this->safePath($path), $contents)->throw();
@@ -55,12 +59,18 @@ class MinecraftServerFileService
             return collect($this->repository($server)->getDirectory($directory === '\\' ? '/' : $directory))
                 ->contains(fn (mixed $file): bool => is_array($file) && ($file['name'] ?? null) === $name);
         } catch (\Throwable $exception) {
-            if ($exception instanceof FileNotFoundException) {
+            if ($this->isMissingPathException($exception)) {
                 return false;
             }
 
             throw $exception;
         }
+    }
+
+    private function isMissingPathException(\Throwable $exception): bool
+    {
+        return $exception instanceof FileNotFoundException
+            || ($exception instanceof RequestException && $exception->response->status() === 404);
     }
 
     public function pullJar(Server $server, string $url, string $fileName = 'server.jar'): void
@@ -150,10 +160,16 @@ class MinecraftServerFileService
     }
 
     /** @param array<string, string> $hashes
+     * @param  null|callable(array{sha1: string, sha256: string, sha512: string, size: int, plugin_version: ?string, class_major_version: ?int}): void  $beforeWrite
      * @return array{sha1: string, sha256: string, sha512: string, size: int, plugin_version: ?string, class_major_version: ?int}
      */
-    public function downloadJarWithMetadata(Server $server, string $url, string $path, array $hashes = []): array
-    {
+    public function downloadJarWithMetadata(
+        Server $server,
+        string $url,
+        string $path,
+        array $hashes = [],
+        ?callable $beforeWrite = null,
+    ): array {
         $this->assertDownloadUrl($url);
         $path = $this->safePath($path);
         if (strtolower(pathinfo($path, PATHINFO_EXTENSION)) !== 'jar') {
@@ -168,39 +184,41 @@ class MinecraftServerFileService
         }
 
         $this->assertJarMagicBytes($contents);
-        $this->assertStrongHashPolicy($hashes);
-
-        $expectedSha512 = Arr::get($hashes, 'sha512');
-        $expectedSha256 = Arr::get($hashes, 'sha256');
-        $expectedSha1 = Arr::get($hashes, 'sha1');
-        $expectedMd5 = Arr::get($hashes, 'md5');
-        if (is_string($expectedSha512) && ! hash_equals(strtolower($expectedSha512), hash('sha512', $contents))) {
-            throw new MinecraftToolkitException('Die SHA-512-Prüfsumme des Downloads ist ungültig.');
-        }
-        if (! is_string($expectedSha512)
-            && is_string($expectedSha256)
-            && ! hash_equals(strtolower($expectedSha256), hash('sha256', $contents))) {
-            throw new MinecraftToolkitException('Die SHA-256-Prüfsumme des Downloads ist ungültig.');
-        }
-        if (! is_string($expectedSha512)
-            && ! is_string($expectedSha256)
-            && is_string($expectedSha1)
-            && ! hash_equals(strtolower($expectedSha1), hash('sha1', $contents))) {
-            throw new MinecraftToolkitException('Die SHA-1-Prüfsumme des Downloads ist ungültig.');
-        }
-        if (! is_string($expectedSha512)
-            && ! is_string($expectedSha256)
-            && ! is_string($expectedSha1)
-            && is_string($expectedMd5)
-            && ! hash_equals(strtolower($expectedMd5), md5($contents))) {
-            throw new MinecraftToolkitException('Die MD5-Prüfsumme des Downloads ist ungültig.');
-        }
+        $this->assertExpectedHashes($contents, $hashes);
 
         $metadata = $this->inspectJarContents($contents);
+        if ($beforeWrite !== null) {
+            $beforeWrite($metadata);
+        }
 
         $this->writeAtomically($server, $path, $contents);
 
         return $metadata;
+    }
+
+    /** @param array<string, string> $hashes
+     * @return array{sha1: string, sha256: string, sha512: string, size: int, plugin_version: ?string, class_major_version: ?int}
+     */
+    public function inspectExistingJarWithMetadata(Server $server, string $path, array $hashes): array
+    {
+        if (! $this->hasVerifiableHash($hashes)) {
+            throw new MinecraftToolkitException(
+                'Die vorhandene Paketdatei kann ohne offizielle Prüfsumme nicht sicher übernommen werden.'
+            );
+        }
+
+        $contents = $this->read(
+            $server,
+            $this->safePath($path),
+            $this->configInt('max_package_bytes', 104857600) + 1
+        );
+        if ($contents === '' || strlen($contents) > $this->configInt('max_package_bytes', 104857600)) {
+            throw new MinecraftToolkitException('Die vorhandene Paketdatei ist leer oder überschreitet das Größenlimit.');
+        }
+
+        $this->assertExpectedHashes($contents, $hashes);
+
+        return $this->inspectJarContents($contents);
     }
 
     /** @return array{sha1: string, sha256: string, sha512: string, size: int, plugin_version: ?string, class_major_version: ?int} */
@@ -225,6 +243,21 @@ class MinecraftServerFileService
         $this->assertJavaClassVersionAllowed($metadata['class_major_version']);
 
         return $metadata;
+    }
+
+    /** @return array{sha1: string, sha256: string, sha512: string, size: int} */
+    public function inspectFileContents(string $contents): array
+    {
+        if ($contents === '' || strlen($contents) > $this->configInt('max_package_bytes', 104857600)) {
+            throw new MinecraftToolkitException('Der Dateiinhalt ist leer oder überschreitet das Größenlimit.');
+        }
+
+        return [
+            'sha1' => hash('sha1', $contents),
+            'sha256' => hash('sha256', $contents),
+            'sha512' => hash('sha512', $contents),
+            'size' => strlen($contents),
+        ];
     }
 
     private function downloadResponse(string $url): Response
@@ -352,18 +385,42 @@ class MinecraftServerFileService
         $timestamp = now()->format('Y-m-d-H-i-s');
         $base = '/.minecraft-toolkit';
         $backupRoot = "$base/backups";
-        $target = "$backupRoot/$timestamp";
+        $target = $this->backupDirectories[$server->uuid] ?? "$backupRoot/$timestamp";
         $repository = $this->repository($server);
 
         $this->ensureDirectory($repository, '.minecraft-toolkit', '/');
         $this->ensureDirectory($repository, 'backups', $base);
-        $this->ensureDirectory($repository, $timestamp, $backupRoot);
+        $this->ensureDirectory($repository, basename($target), $backupRoot);
+        $destination = "$target/".basename($path);
+        if ($this->exists($server, $destination)) {
+            $retryDirectory = "$target/retries";
+            $this->ensureDirectory($repository, 'retries', $target);
+            $destination = $retryDirectory.'/'.now()->format('Y-m-d-H-i-s').'-'.bin2hex(random_bytes(4)).'-'.basename($path);
+        }
         $repository->renameFiles('/', [[
             'from' => ltrim($path, '/'),
-            'to' => ltrim("$target/".basename($path), '/'),
+            'to' => ltrim($destination, '/'),
         ]])->throw();
 
-        return "$target/".basename($path);
+        return $destination;
+    }
+
+    public function withBackupDirectory(Server $server, string $directory, callable $callback): mixed
+    {
+        $directory = $this->safeBackupPath($directory);
+        $key = $server->uuid;
+        $previous = $this->backupDirectories[$key] ?? null;
+        $this->backupDirectories[$key] = $directory;
+
+        try {
+            return $callback();
+        } finally {
+            if ($previous === null) {
+                unset($this->backupDirectories[$key]);
+            } else {
+                $this->backupDirectories[$key] = $previous;
+            }
+        }
     }
 
     public function move(Server $server, string $from, string $to): void
@@ -548,7 +605,7 @@ class MinecraftServerFileService
     private function safeBackupPath(string $path): string
     {
         $path = $this->safePath($path);
-        if (! preg_match('#^/\.minecraft-toolkit/backups/[0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9]{2}-[0-9]{2}-[0-9]{2}$#', $path)) {
+        if (! preg_match('#^/\.minecraft-toolkit/backups/[0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9]{2}-[0-9]{2}-[0-9]{2}(?:-[0-9a-f]{8})?$#', $path)) {
             throw new MinecraftToolkitException('Der Backup-Pfad ist ungültig.');
         }
 
@@ -592,6 +649,50 @@ class MinecraftServerFileService
         throw new MinecraftToolkitException(
             'Diese Installation verlangt SHA-256 oder SHA-512 für Paketdownloads.'
         );
+    }
+
+    /** @param array<string, string> $hashes */
+    private function assertExpectedHashes(string $contents, array $hashes): void
+    {
+        $this->assertStrongHashPolicy($hashes);
+
+        $expectedSha512 = Arr::get($hashes, 'sha512');
+        $expectedSha256 = Arr::get($hashes, 'sha256');
+        $expectedSha1 = Arr::get($hashes, 'sha1');
+        $expectedMd5 = Arr::get($hashes, 'md5');
+        if (is_string($expectedSha512) && ! hash_equals(strtolower($expectedSha512), hash('sha512', $contents))) {
+            throw new MinecraftToolkitException('Die SHA-512-Prüfsumme des Downloads ist ungültig.');
+        }
+        if (! is_string($expectedSha512)
+            && is_string($expectedSha256)
+            && ! hash_equals(strtolower($expectedSha256), hash('sha256', $contents))) {
+            throw new MinecraftToolkitException('Die SHA-256-Prüfsumme des Downloads ist ungültig.');
+        }
+        if (! is_string($expectedSha512)
+            && ! is_string($expectedSha256)
+            && is_string($expectedSha1)
+            && ! hash_equals(strtolower($expectedSha1), hash('sha1', $contents))) {
+            throw new MinecraftToolkitException('Die SHA-1-Prüfsumme des Downloads ist ungültig.');
+        }
+        if (! is_string($expectedSha512)
+            && ! is_string($expectedSha256)
+            && ! is_string($expectedSha1)
+            && is_string($expectedMd5)
+            && ! hash_equals(strtolower($expectedMd5), md5($contents))) {
+            throw new MinecraftToolkitException('Die MD5-Prüfsumme des Downloads ist ungültig.');
+        }
+    }
+
+    /** @param array<string, string> $hashes */
+    private function hasVerifiableHash(array $hashes): bool
+    {
+        foreach (['sha512', 'sha256', 'sha1', 'md5'] as $algorithm) {
+            if (is_string($hashes[$algorithm] ?? null) && trim($hashes[$algorithm]) !== '') {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function assertSafeJarStructure(string $contents): void

@@ -17,7 +17,7 @@ use BlueWolf\MinecraftToolkit\Services\MinecraftSetupOperationService;
 use BlueWolf\MinecraftToolkit\Services\MinecraftSetupService;
 use Filament\Notifications\Notification;
 use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldBeUnique;
+use Illuminate\Contracts\Queue\ShouldBeUniqueUntilProcessing;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
@@ -25,9 +25,10 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Throwable;
 
-class RunMinecraftSetupOperationJob implements ShouldBeUnique, ShouldQueue
+class RunMinecraftSetupOperationJob implements ShouldBeUniqueUntilProcessing, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
@@ -91,6 +92,8 @@ class RunMinecraftSetupOperationJob implements ShouldBeUnique, ShouldQueue
                         'last_heartbeat_at' => now(),
                     ])->save();
 
+                    $this->scheduleContinuation();
+
                     return;
                 }
 
@@ -115,6 +118,8 @@ class RunMinecraftSetupOperationJob implements ShouldBeUnique, ShouldQueue
                     (int) config('minecrafttoolkit.setup_backup_timeout_minutes', 120)
                 );
                 if ($backupState === 'waiting') {
+                    $this->scheduleContinuation();
+
                     return;
                 }
                 if ($backupState === 'timed_out') {
@@ -146,43 +151,51 @@ class RunMinecraftSetupOperationJob implements ShouldBeUnique, ShouldQueue
             }
 
             try {
-                $setup = $operation->setup;
-                if (! $setup instanceof MinecraftToolkitSetup) {
-                    $setup = null;
-                    $recoveredSetup = MinecraftToolkitSetup::query()
-                        ->where('server_uuid', $operation->server_uuid)
-                        ->where('setup_status', 'completed')
-                        ->where('setup_started_at', '>=', $operation->started_at)
-                        ->first();
-                    if ($recoveredSetup instanceof MinecraftToolkitSetup) {
-                        $setup = $recoveredSetup;
-                        $operation->forceFill([
-                            'setup_id' => $setup->id,
-                            'stage' => 'core_setup_completed',
-                            'last_heartbeat_at' => now(),
-                        ])->save();
-                    }
-                }
-                if ($operation->stage !== 'core_setup_completed' || $setup === null) {
-                    $payload = $operation->payload_json;
-                    $iconPath = $operations->stagedPath($operation, $operation->icon_file);
-                    $setup = $setups->setup($server, $payload, $iconPath, $operation->user_id);
-                    $operation->forceFill([
-                        'setup_id' => $setup->id,
-                        'stage' => 'core_setup_completed',
-                        'last_error' => null,
-                        'last_heartbeat_at' => now(),
-                    ])->save();
-                }
+                $setup = $files->withBackupDirectory(
+                    $server,
+                    $operations->localBackupDirectory($operation),
+                    function () use ($operation, $operations, $server, $setups, $modpacks): MinecraftToolkitSetup {
+                        $setup = $operation->setup;
+                        if (! $setup instanceof MinecraftToolkitSetup) {
+                            $setup = null;
+                            $recoveredSetup = MinecraftToolkitSetup::query()
+                                ->where('server_uuid', $operation->server_uuid)
+                                ->whereIn('setup_status', ['installing', 'completed'])
+                                ->where('setup_started_at', '>=', $operation->started_at)
+                                ->first();
+                            if ($recoveredSetup instanceof MinecraftToolkitSetup) {
+                                $setup = $recoveredSetup;
+                                $operation->forceFill([
+                                    'setup_id' => $setup->id,
+                                    'stage' => 'core_setup_completed',
+                                    'last_heartbeat_at' => now(),
+                                ])->save();
+                            }
+                        }
+                        if (! in_array($operation->stage, ['core_setup_completed', 'modpack_completed'], true) || $setup === null) {
+                            $payload = $operation->payload_json;
+                            $iconPath = $operations->stagedPath($operation, $operation->icon_file);
+                            $setup = $setups->setup($server, $payload, $iconPath, $operation->user_id);
+                            $operation->forceFill([
+                                'setup_id' => $setup->id,
+                                'stage' => 'core_setup_completed',
+                                'last_error' => null,
+                                'last_heartbeat_at' => now(),
+                            ])->save();
+                        }
 
-                $modpackPath = $operations->stagedPath($operation, $operation->modpack_file);
-                if ($modpackPath !== null && $operation->stage !== 'modpack_completed') {
-                    $modpacks->installUpload($server, $setup, $modpackPath, $operation->modpack_mode);
-                    $operation->forceFill([
-                        'stage' => 'modpack_completed',
-                        'last_heartbeat_at' => now(),
-                    ])->save();
-                }
+                        $modpackPath = $operations->stagedPath($operation, $operation->modpack_file);
+                        if ($modpackPath !== null && $operation->stage !== 'modpack_completed') {
+                            $modpacks->installUpload($server, $setup, $modpackPath, $operation->modpack_mode);
+                            $operation->forceFill([
+                                'stage' => 'modpack_completed',
+                                'last_heartbeat_at' => now(),
+                            ])->save();
+                        }
+
+                        return $setup;
+                    }
+                );
             } finally {
                 if ($previousUser instanceof User) {
                     $guard->setUser($previousUser);
@@ -191,13 +204,20 @@ class RunMinecraftSetupOperationJob implements ShouldBeUnique, ShouldQueue
                 }
             }
 
-            $operation->forceFill([
-                'status' => 'completed',
-                'stage' => 'completed',
-                'last_error' => null,
-                'completed_at' => now(),
-                'last_heartbeat_at' => now(),
-            ])->save();
+            DB::transaction(function () use ($setup, $operation): void {
+                $completedAt = now();
+                $setup->forceFill([
+                    'setup_status' => 'completed',
+                    'setup_completed_at' => $completedAt,
+                ])->save();
+                $operation->forceFill([
+                    'status' => 'completed',
+                    'stage' => 'completed',
+                    'last_error' => null,
+                    'completed_at' => $completedAt,
+                    'last_heartbeat_at' => $completedAt,
+                ])->save();
+            });
             $operations->cleanupStagedFiles($operation->uuid);
             $this->notify($operation, 'success', trans('minecrafttoolkit::strings.setup.complete'), trans('minecrafttoolkit::strings.setup.operation_complete_body'));
         } catch (Throwable $exception) {
@@ -233,6 +253,14 @@ class RunMinecraftSetupOperationJob implements ShouldBeUnique, ShouldQueue
 
     private function markFailed(MinecraftToolkitSetupOperation $operation, string $message, MinecraftSetupOperationService $operations): void
     {
+        $setup = $operation->setup;
+        if ($setup instanceof MinecraftToolkitSetup && ! $setup->isComplete()) {
+            $setup->forceFill([
+                'setup_status' => 'failed',
+                'last_error' => mb_substr($message, 0, 2000),
+            ])->save();
+        }
+
         $operation->forceFill([
             'status' => 'failed',
             'stage' => 'failed',
@@ -242,6 +270,11 @@ class RunMinecraftSetupOperationJob implements ShouldBeUnique, ShouldQueue
         ])->save();
         $operations->cleanupStagedFiles($operation->uuid);
         $this->notify($operation, 'danger', trans('minecrafttoolkit::strings.setup.failed'), $message);
+    }
+
+    private function scheduleContinuation(): void
+    {
+        self::dispatch($this->operationId)->delay(now()->addSeconds(15));
     }
 
     private function notify(MinecraftToolkitSetupOperation $operation, string $status, string $title, string $body): void

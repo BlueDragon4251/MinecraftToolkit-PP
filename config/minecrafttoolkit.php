@@ -59,7 +59,7 @@ return [
     'max_package_bytes' => max(1048576, (int) env('MINECRAFT_TOOLKIT_MAX_PACKAGE_BYTES', 104857600)),
     'max_jar_entries' => max(100, (int) env('MINECRAFT_TOOLKIT_MAX_JAR_ENTRIES', 20000)),
     'max_jar_entry_bytes' => max(1048576, (int) env('MINECRAFT_TOOLKIT_MAX_JAR_ENTRY_BYTES', 52428800)),
-    'user_agent' => env('MINECRAFT_TOOLKIT_USER_AGENT', 'BlueIT-MinecraftToolkit/1.3.7'),
+    'user_agent' => env('MINECRAFT_TOOLKIT_USER_AGENT', 'BlueIT-MinecraftToolkit/1.3.8'),
     'blueit_announcements_enabled' => $boolean(env('MINECRAFT_TOOLKIT_BLUEIT_ANNOUNCEMENTS_ENABLED', true), true),
     'blueit_announcements_url' => rtrim((string) env('MINECRAFT_TOOLKIT_BLUEIT_ANNOUNCEMENTS_URL', 'https://blueit42.vercel.app/api/announcements'), '/'),
     'blueit_announcements_secret' => env('MINECRAFT_TOOLKIT_BLUEIT_ANNOUNCEMENTS_SECRET', 'blueit42-announcements-v1'),

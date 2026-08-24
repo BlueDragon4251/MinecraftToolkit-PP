@@ -379,6 +379,7 @@ return [
         'health_trusted_source' => 'trusted source',
         'health_known_source' => 'known source',
         'health_sha512' => 'SHA-512 stored',
+        'health_sha256' => 'SHA-256 stored',
         'health_sha1' => 'SHA-1 stored',
         'health_no_hash' => 'no stored hash',
         'health_pinned' => 'pinned',

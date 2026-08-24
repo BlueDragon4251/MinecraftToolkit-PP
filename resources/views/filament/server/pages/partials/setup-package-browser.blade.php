@@ -1,9 +1,3 @@
-@php
-    $formData = $page->data ?? [];
-    $software = $formData['software'] ?? null;
-    $source = $formData['setup_package_source'] ?? 'modrinth';
-@endphp
-
 @if (in_array($software, ['paper', 'purpur', 'folia', 'fabric', 'forge', 'neoforge'], true))
     <div class="space-y-4">
         <div class="flex flex-wrap gap-3">

@@ -75,7 +75,13 @@ class MinecraftModpacksPage extends Page implements HasSchemas
         return MinecraftToolkitSetup::query()
             ->where('server_uuid', $server->uuid)
             ->where('setup_status', 'completed')
+            ->whereIn('software', ['fabric', 'forge', 'neoforge'])
             ->exists();
+    }
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return static::canAccess();
     }
 
     public function mount(): void

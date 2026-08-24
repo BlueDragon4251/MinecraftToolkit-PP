@@ -83,9 +83,22 @@ class MinecraftSetupPage extends Page implements HasSchemas
     {
         $this->authorizeAccess();
         $this->refreshOperationState();
+
+        if ($this->setupOperationStatus === 'completed') {
+            return;
+        }
+
         $this->form->fill($this->defaults());
         $this->setupPackageResults = [];
         $this->setupPackageResultsTitle = trans('minecrafttoolkit::strings.setup.package_browser_waiting');
+    }
+
+    public function hydrate(): void
+    {
+        // Keep the custom package browser and Filament's hidden form field in sync
+        // across every Livewire request. Either side can otherwise carry a stale
+        // snapshot when several package actions are performed in succession.
+        $this->synchronizeSelectedSetupPackageIds($this->data['setup_package_ids'] ?? []);
     }
 
     public static function canAccess(): bool
@@ -104,6 +117,37 @@ class MinecraftSetupPage extends Page implements HasSchemas
         $user = user();
         if (! $server instanceof Server || $user === null
             || ! app(MinecraftPermissionService::class)->canModify($user, $server)) {
+            return false;
+        }
+
+        $hasCompletedSetup = MinecraftToolkitSetup::query()
+            ->where('server_uuid', $server->uuid)
+            ->where('setup_status', 'completed')
+            ->exists();
+        if (! $hasCompletedSetup) {
+            return true;
+        }
+
+        // Keep the page accessible just long enough for its worker-status poll to
+        // observe an atomically completed operation and redirect to the overview.
+        if (! Schema::hasTable('minecraft_toolkit_setup_operations')) {
+            return false;
+        }
+
+        return MinecraftToolkitSetupOperation::query()
+            ->where('server_id', $server->id)
+            ->latest('id')
+            ->value('status') === 'completed';
+    }
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        if (! static::canAccess()) {
+            return false;
+        }
+
+        $server = Filament::getTenant();
+        if (! $server instanceof Server) {
             return false;
         }
 
@@ -138,6 +182,7 @@ class MinecraftSetupPage extends Page implements HasSchemas
         return [
             Wizard::make([
                 Step::make('software')
+                    ->key('software')
                     ->label(trans('minecrafttoolkit::strings.setup.software'))
                     ->icon('tabler-box')
                     ->schema([
@@ -162,6 +207,7 @@ class MinecraftSetupPage extends Page implements HasSchemas
                                 $set('setup_package_profile', null);
                                 $set('setup_package_ids', []);
                                 $this->selectedSetupPackageIds = [];
+                                $this->data['setup_package_ids'] = [];
                                 $this->setupPackagePage = 0;
                                 $this->resetSetupPackageBrowser();
                             })
@@ -169,6 +215,7 @@ class MinecraftSetupPage extends Page implements HasSchemas
                             ->helperText(trans('minecrafttoolkit::strings.setup.software_help')),
                     ]),
                 Step::make('version')
+                    ->key('version')
                     ->label(trans('minecrafttoolkit::strings.setup.version'))
                     ->icon('tabler-tag')
                     ->schema([
@@ -182,6 +229,7 @@ class MinecraftSetupPage extends Page implements HasSchemas
                                 $set('loader_version', null);
                                 $set('setup_package_ids', []);
                                 $this->selectedSetupPackageIds = [];
+                                $this->data['setup_package_ids'] = [];
                                 $this->setupPackagePage = 0;
                                 $this->resetSetupPackageBrowser();
                             })
@@ -210,6 +258,7 @@ class MinecraftSetupPage extends Page implements HasSchemas
                             )),
                     ]),
                 Step::make('settings')
+                    ->key('settings')
                     ->label(trans('minecrafttoolkit::strings.setup.server_settings'))
                     ->icon('tabler-adjustments')
                     ->schema([
@@ -285,6 +334,7 @@ class MinecraftSetupPage extends Page implements HasSchemas
                             ]),
                     ]),
                 Step::make('icon')
+                    ->key('icon')
                     ->label(trans('minecrafttoolkit::strings.setup.server_icon'))
                     ->icon('tabler-photo')
                     ->visible(fn (Get $get): bool => $get('software') !== 'bedrock')
@@ -298,6 +348,7 @@ class MinecraftSetupPage extends Page implements HasSchemas
                             ->helperText(trans('minecrafttoolkit::strings.setup.server_icon_help')),
                     ]),
                 Step::make('crossplay')
+                    ->key('crossplay')
                     ->label(trans('minecrafttoolkit::strings.setup.crossplay'))
                     ->icon('tabler-device-gamepad-2')
                     ->visible(fn (Get $get): bool => (bool) config('minecrafttoolkit.crossplay_enabled', true)
@@ -318,6 +369,7 @@ class MinecraftSetupPage extends Page implements HasSchemas
                             ->schema([]),
                     ]),
                 Step::make('packages')
+                    ->key('packages')
                     ->label(trans('minecrafttoolkit::strings.setup.packages'))
                     ->icon('tabler-packages')
                     ->visible(fn (Get $get): bool => (string) ($get('minecraft_version') ?? '') !== ''
@@ -377,6 +429,7 @@ class MinecraftSetupPage extends Page implements HasSchemas
                             ->columnSpanFull(),
                     ]),
                 Step::make('review')
+                    ->key('review')
                     ->label(trans('minecrafttoolkit::strings.setup.review'))
                     ->icon('tabler-list-check')
                     ->schema([
@@ -405,7 +458,10 @@ class MinecraftSetupPage extends Page implements HasSchemas
                                     ->required(),
                             ]),
                     ]),
-            ])->columnSpanFull(),
+            ])
+                ->key('minecraft-setup-wizard')
+                ->persistStepInQueryString('minecraft-setup-step')
+                ->columnSpanFull(),
         ];
     }
 
@@ -415,6 +471,7 @@ class MinecraftSetupPage extends Page implements HasSchemas
         $server = Filament::getTenant();
 
         try {
+            $this->synchronizeSelectedSetupPackageIds($this->data['setup_package_ids'] ?? []);
             $state = $this->form->getState();
             $state['setup_package_ids'] = $this->normalizedSelectedSetupPackageIds($state['setup_package_ids'] ?? []);
             $icon = $state['server_icon'] ?? null;
@@ -595,6 +652,7 @@ class MinecraftSetupPage extends Page implements HasSchemas
         $set('setup_package_profile', null);
         $set('setup_package_ids', []);
         $this->selectedSetupPackageIds = [];
+        $this->data['setup_package_ids'] = [];
         $this->setupPackagePage = 0;
         $this->resetSetupPackageBrowser();
     }
@@ -629,11 +687,10 @@ class MinecraftSetupPage extends Page implements HasSchemas
             array_map('strval', $profile['packages']),
             fn (string $id): bool => $id !== '' && str_contains($id, ':')
         ));
-        $this->selectedSetupPackageIds = array_values(array_unique(array_merge(
-            $this->selectedSetupPackageIds,
+        $this->synchronizeSelectedSetupPackageIds(array_values(array_unique(array_merge(
+            $this->normalizedSelectedSetupPackageIds($this->data['setup_package_ids'] ?? []),
             $packages
-        )));
-        $this->data['setup_package_ids'] = $this->selectedSetupPackageIds;
+        ))));
     }
 
     /** @return array<string, string> */
@@ -762,15 +819,10 @@ class MinecraftSetupPage extends Page implements HasSchemas
             return '<p class="text-sm text-gray-500">'.e(trans('minecrafttoolkit::strings.setup.package_browser_waiting')).'</p>';
         }
 
-        $this->data['software'] = (string) ($get('software') ?? $this->data['software'] ?? '');
-        $this->data['minecraft_version'] = (string) ($get('minecraft_version') ?? $this->data['minecraft_version'] ?? '');
-        $this->data['loader_version'] = $get('loader_version') ?? ($this->data['loader_version'] ?? null);
-        $this->data['setup_package_source'] = (string) ($get('setup_package_source') ?: ($this->data['setup_package_source'] ?? 'modrinth'));
-        $this->data['setup_package_query'] = (string) ($get('setup_package_query') ?? $this->data['setup_package_query'] ?? '');
-        $this->data['setup_package_ids'] = $this->selectedSetupPackageIds;
-
         return view('minecrafttoolkit::filament.server.pages.partials.setup-package-browser', [
             'page' => $this,
+            'software' => (string) ($get('software') ?? ''),
+            'source' => (string) ($get('setup_package_source') ?: 'modrinth'),
         ])->render();
     }
 
@@ -824,16 +876,17 @@ class MinecraftSetupPage extends Page implements HasSchemas
 
     public function toggleSetupPackage(string $sourceProjectId): void
     {
-        if (in_array($sourceProjectId, $this->selectedSetupPackageIds, true)) {
-            $this->selectedSetupPackageIds = array_values(array_filter(
-                $this->selectedSetupPackageIds,
+        $selectedPackageIds = $this->normalizedSelectedSetupPackageIds($this->data['setup_package_ids'] ?? []);
+        if (in_array($sourceProjectId, $selectedPackageIds, true)) {
+            $selectedPackageIds = array_values(array_filter(
+                $selectedPackageIds,
                 fn (string $id): bool => $id !== $sourceProjectId
             ));
         } else {
-            $this->selectedSetupPackageIds[] = $sourceProjectId;
+            $selectedPackageIds[] = $sourceProjectId;
         }
 
-        $this->data['setup_package_ids'] = $this->selectedSetupPackageIds;
+        $this->synchronizeSelectedSetupPackageIds($selectedPackageIds);
     }
 
     public function setupPackageSelected(string $sourceProjectId): bool
@@ -900,6 +953,13 @@ class MinecraftSetupPage extends Page implements HasSchemas
             array_map('strval', array_merge($fromState, $this->selectedSetupPackageIds)),
             fn (string $id): bool => $id !== '' && str_contains($id, ':')
         )));
+    }
+
+    private function synchronizeSelectedSetupPackageIds(mixed $statePackageIds): void
+    {
+        $selectedPackageIds = $this->normalizedSelectedSetupPackageIds($statePackageIds);
+        $this->selectedSetupPackageIds = $selectedPackageIds;
+        $this->data['setup_package_ids'] = $selectedPackageIds;
     }
 
     private function loadSetupPackages(bool $popular = false): void
