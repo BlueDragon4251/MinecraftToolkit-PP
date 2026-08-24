@@ -6,7 +6,7 @@ Minecraft Toolkit is a Pelican Panel plugin for setting up and managing Minecraf
 
 See [`CHANGELOG.md`](./CHANGELOG.md) for version history and notable changes.
 
-Current version: `1.3.6`.
+Current version: `1.3.8`.
 
 ## License and usage rights
 
@@ -55,15 +55,18 @@ All server files are accessed through Pelican's Wings API. The plugin does not r
 - A stopped server for setup, package installation, updates, or configuration changes
 - Permission to edit server files
 - Permission to change the startup command when installing Fabric, Forge, NeoForge, or Vanilla Bedrock
+- For servers that already contain files: a free Pelican backup slot and a configured, reachable backup host
 
-A queue worker and Laravel scheduler are required for scheduled metadata warming, automatic update checks, and post-update health verification. Manual setup, installs, updates, and checks remain usable without scheduled execution.
+A queue worker and Laravel scheduler are required for safe setup execution and recovery, scheduled metadata warming, automatic update checks, and post-update health verification. Installer, updater, management, and manual checks remain usable without scheduled execution.
 
 Recommended production processes:
 
 ```bash
-php artisan queue:work --tries=3
-* * * * * cd /var/www/pelican && php artisan schedule:run >> /dev/null 2>&1
+sudo -u www-data php artisan queue:work --tries=3
+sudo -u www-data php artisan schedule:run
 ```
+
+Replace `www-data` with the operating-system user used by PHP-FPM in your installation. The queue worker, scheduler, and maintenance commands must run as that same user. Running Artisan as `root` while PHP-FPM runs as `www-data` can create root-owned entries in `storage/framework/cache` and make the entire Panel return HTTP 500.
 
 ## Installation through Plugin Upload
 
@@ -80,8 +83,8 @@ The Pelican plugin installer discovers and runs the migrations in `database/migr
 ```bash
 cd /var/www/pelican
 cp -R /path/to/minecrafttoolkit plugins/minecrafttoolkit
-php artisan p:plugin:install
-php artisan optimize:clear
+sudo -u www-data php artisan p:plugin:install
+sudo -u www-data php artisan optimize:clear
 ```
 
 The directory name must remain `minecrafttoolkit`, because it must match the plugin ID in `plugin.json`.
@@ -98,12 +101,14 @@ The directory name must remain `minecrafttoolkit`, because it must match the plu
 8. Optionally upload a 64x64 PNG server icon.
 9. For Paper or Purpur, optionally enable crossplay and select a Bedrock allocation. Folia intentionally does not expose the crossplay switch because Paper plugin compatibility is not guaranteed.
 10. Optionally select multiple compatible plugins or mods that should be installed directly after setup. You can switch between Modrinth and CurseForge without losing the previous selections, so mixed-provider setups are supported.
-11. Review the setup and start it.
+11. Confirm the safety notice, review the setup, and start it.
 
-Existing target files are moved to:
+Setup is persisted and processed by the Laravel queue. If the server contains any existing file or directory outside `/.minecraft-toolkit`, Minecraft Toolkit first creates a complete Pelican/Wings backup, requires a successful completion with checksum, and keeps that backup locked. Setup does not mutate server files when the backup cannot be created or verified. The scheduler resumes interrupted operations after Panel or node outages.
+
+Individual target replacements are also written atomically. All target files replaced by one setup attempt are grouped in the same directory, and retry copies never overwrite the original backups:
 
 ```text
-/.minecraft-toolkit/backups/YYYY-MM-DD-HH-mm-ss/
+/.minecraft-toolkit/backups/YYYY-MM-DD-HH-mm-ss-xxxxxxxx/
 ```
 
 Forge loader versions are resolved from both Maven metadata and Forge promotion metadata, so older Minecraft versions can still show their matching Forge builds when only recommended/latest metadata is exposed. NeoForge loader discovery includes the legacy `1.20.1` NeoForged Forge artifact and the modern NeoForge artifact, while preserving modern `26.x` Minecraft version labels. Forge and NeoForge use their official `--installServer` flow during the first server start. Vanilla Bedrock downloads the official Linux Bedrock Dedicated Server ZIP and extracts it during the first server start. That first launch creates `run.sh` and the loader libraries and can take several minutes.
@@ -287,13 +292,13 @@ Administrators can configure Minecraft Toolkit from the Pelican plugin settings 
 | `MINECRAFT_TOOLKIT_MAX_PACKAGE_BYTES` | `104857600` | Maximum package size |
 | `MINECRAFT_TOOLKIT_MAX_JAR_ENTRIES` | `20000` | Maximum number of entries accepted inside a downloaded JAR |
 | `MINECRAFT_TOOLKIT_MAX_JAR_ENTRY_BYTES` | `52428800` | Maximum uncompressed size for a single JAR entry |
-| `MINECRAFT_TOOLKIT_USER_AGENT` | `BlueIT-MinecraftToolkit/1.3.5` | User-Agent for external requests |
+| `MINECRAFT_TOOLKIT_USER_AGENT` | `BlueIT-MinecraftToolkit/1.3.8` | User-Agent for external requests |
 
 After changing environment values manually, clear cached configuration:
 
 ```bash
 cd /var/www/pelican
-php artisan optimize:clear
+sudo -u www-data php artisan optimize:clear
 ```
 
 ## Permissions
@@ -328,7 +333,8 @@ For Paper/Purpur crossplay, applying the Crossplay configuration also patches Ge
 
 ## Troubleshooting
 
-- **Minecraft pages are missing:** verify the plugin is enabled, migrations completed, and run `php artisan optimize:clear`.
+- **Minecraft pages are missing:** verify the plugin is enabled, migrations completed, and run `sudo -u www-data php artisan optimize:clear` (replace `www-data` with the PHP-FPM user).
+- **The whole Panel returns HTTP 500 with `storage/framework/cache ... Permission denied`:** stop queue workers started as `root`, restore ownership of `storage` and `bootstrap/cache` to the PHP-FPM user, clear caches as that user, and restart the queue worker as the same user. This is a host process-user mismatch, not a Wings file failure.
 - **Setup says no allocation exists:** assign a primary allocation to the Pelican server.
 - **Action says the server must be stopped:** stop it completely and wait until Wings reports `offline`, `exited`, `dead`, or `created`.
 - **Fabric, Forge, or NeoForge setup is denied:** grant startup-update permission or run the setup as the server owner or an administrator.

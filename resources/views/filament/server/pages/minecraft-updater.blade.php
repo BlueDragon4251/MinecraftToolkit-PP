@@ -68,12 +68,12 @@
                                 <span class="text-xs text-gray-500"> | {{ $package['checked_at'] }}</span>
                             @endif
                         </div>
-                        <div class="mt-1 text-xs text-gray-500">
-                            <span class="{{ $package['health']['color'] }}">
+                        <div class="mt-2 flex flex-wrap items-center gap-2 text-xs text-gray-500">
+                            <x-filament::badge :color="$package['health']['color']" size="sm">
                                 {{ trans('minecrafttoolkit::strings.updater.health') }}: {{ $package['health']['score'] }}/100 - {{ $package['health']['label'] }}
-                            </span>
+                            </x-filament::badge>
                             @if ($package['health']['reasons'])
-                                <span> | {{ implode(', ', $package['health']['reasons']) }}</span>
+                                <span>{{ implode(', ', $package['health']['reasons']) }}</span>
                             @endif
                         </div>
                         <div class="mt-2 grid gap-1 text-xs text-gray-500 md:grid-cols-2">

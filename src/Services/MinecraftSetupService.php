@@ -27,7 +27,7 @@ class MinecraftSetupService
     ) {}
 
     /** @param array<string, mixed> $data */
-    public function setup(Server $server, array $data, mixed $icon = null): MinecraftToolkitSetup
+    public function setup(Server $server, array $data, mixed $icon = null, ?int $userId = null): MinecraftToolkitSetup
     {
         /** @var Lock $lock */
         $lock = Cache::lock("minecrafttoolkit.setup.{$server->uuid}", 600);
@@ -36,14 +36,14 @@ class MinecraftSetupService
         }
 
         try {
-            return $this->performSetup($server, $data, $icon);
+            return $this->performSetup($server, $data, $icon, $userId);
         } finally {
             $lock->release();
         }
     }
 
     /** @param array<string, mixed> $data */
-    private function performSetup(Server $server, array $data, mixed $icon): MinecraftToolkitSetup
+    private function performSetup(Server $server, array $data, mixed $icon, ?int $userId): MinecraftToolkitSetup
     {
         if (! $server->allocation) {
             throw new MinecraftToolkitException(
@@ -61,7 +61,7 @@ class MinecraftSetupService
 
         $setup = MinecraftToolkitSetup::query()->updateOrCreate(
             ['server_uuid' => $server->uuid],
-            $this->setupAttributes($server, $data) + [
+            $this->setupAttributes($server, $data, $userId) + [
                 'setup_status' => 'installing',
                 'setup_started_at' => now(),
                 'setup_completed_at' => null,
@@ -72,36 +72,30 @@ class MinecraftSetupService
 
         try {
             $isBedrock = (string) $data['software'] === 'bedrock';
-            if ((bool) config('minecrafttoolkit.backup_before_overwrite', true)) {
-                $this->files->backupIfPresent($server, '/server.jar');
-                $this->files->backupIfPresent($server, '/server.properties');
-                $this->files->backupIfPresent($server, '/server-icon.png');
-                $this->files->backupIfPresent($server, '/bedrock-server.zip');
-                if ($download['file_name'] !== 'server.jar' && $download['file_name'] !== 'bedrock-server.zip') {
-                    $this->files->backupIfPresent($server, '/'.$download['file_name']);
-                }
-            }
-
             if ($isBedrock) {
-                $this->files->downloadFile($server, $download['url'], $download['file_name'], ['zip']);
-                $this->files->write(
+                $artifactMetadata = $this->files->downloadFile($server, $download['url'], $download['file_name'], ['zip']);
+                $this->files->writeAtomically(
                     $server,
                     '/server.properties',
                     $this->properties->generateBedrock($data, (int) $server->allocation->port)
                 );
             } else {
                 if (is_string($download['sha256'])) {
-                    $this->files->downloadJar(
+                    $artifactMetadata = $this->files->downloadJarWithMetadata(
                         $server,
                         $download['url'],
                         '/'.$download['file_name'],
                         ['sha256' => $download['sha256']]
                     );
                 } else {
-                    $this->files->pullJar($server, $download['url'], $download['file_name']);
+                    $artifactMetadata = $this->files->downloadJarWithMetadata(
+                        $server,
+                        $download['url'],
+                        '/'.$download['file_name']
+                    );
                 }
-                $this->files->write($server, '/eula.txt', "eula=true\n");
-                $this->files->write(
+                $this->files->writeAtomically($server, '/eula.txt', "eula=true\n");
+                $this->files->writeAtomically(
                     $server,
                     '/server.properties',
                     $this->properties->generateJava($data, (int) $server->allocation->port)
@@ -122,8 +116,8 @@ class MinecraftSetupService
                 'server_jar_path' => (! $download['installer'] && ! $isBedrock) ? '/'.$download['file_name'] : null,
                 'server_binary_path' => $isBedrock ? '/bedrock_server' : ($download['installer'] ? '/run.sh' : null),
                 'icon_path' => $iconInstalled ? '/server-icon.png' : null,
-                'setup_status' => 'completed',
-                'setup_completed_at' => now(),
+                'setup_status' => 'installing',
+                'setup_completed_at' => null,
                 'last_error' => null,
             ])->save();
 
@@ -145,27 +139,22 @@ class MinecraftSetupService
                     'file_name' => $download['file_name'],
                     'file_path' => '/'.$download['file_name'],
                     'download_url' => $download['url'],
+                    'sha1' => $artifactMetadata['sha1'] ?? null,
+                    'sha512' => $artifactMetadata['sha512'] ?? null,
                     'dependencies_json' => is_string($download['sha256'])
                         ? ['sha256' => $download['sha256']]
                         : null,
                     'is_system_package' => true,
                     'managed' => true,
                     'enabled' => true,
-                    'installed_by' => user()?->id,
+                    'installed_by' => $userId ?? user()?->id,
                     'installed_at' => now(),
                 ]
             );
 
-            $setupPackageFailures = $this->installSelectedSetupPackages($server, $setup->refresh(), $data['setup_package_ids'] ?? []);
-            if ($setupPackageFailures !== []) {
-                $setup->forceFill([
-                    'last_error' => 'Einige ausgewählte Pakete konnten nach dem Setup nicht installiert werden: '.implode('; ', $setupPackageFailures),
-                ])->save();
-            }
+            $this->installSelectedSetupPackages($server, $setup->refresh(), $data['setup_package_ids'] ?? []);
 
-            $this->log($server, 'setup_completed', $setupPackageFailures === [] ? 'success' : 'warning', $setupPackageFailures === []
-                ? 'Minecraft-Setup wurde erfolgreich abgeschlossen.'
-                : 'Minecraft-Setup wurde abgeschlossen, aber einige ausgewählte Pakete konnten nicht installiert werden.');
+            $this->log($server, 'setup_completed', 'success', 'Minecraft-Setup wurde erfolgreich abgeschlossen.');
             if ($download['installer']) {
                 $this->log(
                     $server,
@@ -201,11 +190,11 @@ class MinecraftSetupService
     }
 
     /** @param array<string, mixed> $data */
-    private function setupAttributes(Server $server, array $data): array
+    private function setupAttributes(Server $server, array $data, ?int $userId): array
     {
         return [
             'server_id' => $server->id,
-            'user_id' => user()?->id,
+            'user_id' => $userId ?? user()?->id,
             'edition' => $data['software'] === 'bedrock' ? 'bedrock' : 'java',
             'software' => $data['software'],
             'minecraft_version' => $data['minecraft_version'],
@@ -237,13 +226,10 @@ class MinecraftSetupService
         ];
     }
 
-    /**
-     * @return string[]
-     */
-    private function installSelectedSetupPackages(Server $server, MinecraftToolkitSetup $setup, mixed $selectedPackages): array
+    private function installSelectedSetupPackages(Server $server, MinecraftToolkitSetup $setup, mixed $selectedPackages): void
     {
         if (! is_array($selectedPackages) || $selectedPackages === []) {
-            return [];
+            return;
         }
 
         $failures = [];
@@ -255,8 +241,8 @@ class MinecraftSetupService
             [$source, $projectId] = explode(':', $selectedPackage, 2);
             try {
                 match ($source) {
-                    'modrinth' => $this->packageInstaller->installModrinthPackage($server, $setup, $projectId),
-                    'curseforge' => $this->packageInstaller->installCurseForgePackage($server, $setup, $projectId),
+                    'modrinth' => $this->packageInstaller->installModrinthPackage($server, $setup, $projectId, true),
+                    'curseforge' => $this->packageInstaller->installCurseForgePackage($server, $setup, $projectId, true),
                     default => throw new MinecraftToolkitException('Ungültige Paketquelle.'),
                 };
             } catch (\Throwable $exception) {
@@ -270,7 +256,11 @@ class MinecraftSetupService
             }
         }
 
-        return $failures;
+        if ($failures !== []) {
+            throw new MinecraftToolkitException(
+                'Ausgewählte Pakete konnten nicht installiert werden: '.implode('; ', $failures)
+            );
+        }
     }
 
     private function writeIcon(Server $server, mixed $icon): bool
@@ -279,7 +269,9 @@ class MinecraftSetupService
             return false;
         }
 
-        $contents = method_exists($icon, 'getContent') ? $icon->getContent() : null;
+        $contents = is_string($icon) && is_file($icon)
+            ? file_get_contents($icon)
+            : (method_exists($icon, 'getContent') ? $icon->getContent() : null);
         if (! is_string($contents) || $contents === '') {
             throw new MinecraftToolkitException('Das Server-Icon konnte nicht gelesen werden.');
         }
@@ -298,7 +290,7 @@ class MinecraftSetupService
             throw new MinecraftToolkitException('Das Server-Icon muss eine 64x64 Pixel große PNG-Datei sein.');
         }
 
-        $this->files->write($server, '/server-icon.png', $contents);
+        $this->files->writeAtomically($server, '/server-icon.png', $contents);
 
         return true;
     }

@@ -28,26 +28,32 @@ class MinecraftPackageInstaller
         return $this->installModrinthPackage($server, $setup, $projectId);
     }
 
-    public function installModrinthPackage(Server $server, MinecraftToolkitSetup $setup, string $projectId): MinecraftToolkitPackage
-    {
-        return $this->installPackage($server, $setup, 'modrinth', $projectId);
+    public function installModrinthPackage(
+        Server $server,
+        MinecraftToolkitSetup $setup,
+        string $projectId,
+        bool $allowAlreadyInstalled = false
+    ): MinecraftToolkitPackage {
+        return $this->installPackage($server, $setup, 'modrinth', $projectId, $allowAlreadyInstalled);
     }
 
     public function installCurseForgePackage(
         Server $server,
         MinecraftToolkitSetup $setup,
-        string $projectId
+        string $projectId,
+        bool $allowAlreadyInstalled = false
     ): MinecraftToolkitPackage {
         $this->riskGate->assertAllowed('curseforge_usage', $server);
 
-        return $this->installPackage($server, $setup, 'curseforge', $projectId);
+        return $this->installPackage($server, $setup, 'curseforge', $projectId, $allowAlreadyInstalled);
     }
 
     private function installPackage(
         Server $server,
         MinecraftToolkitSetup $setup,
         string $source,
-        string $projectId
+        string $projectId,
+        bool $allowAlreadyInstalled = false
     ): MinecraftToolkitPackage {
         /** @var Lock $lock */
         $lock = Cache::lock("minecrafttoolkit.install.{$server->uuid}", 600);
@@ -58,7 +64,7 @@ class MinecraftPackageInstaller
         try {
             $this->state->assertOffline($server);
 
-            return $this->performInstall($server, $setup, $source, $projectId, false, []);
+            return $this->performInstall($server, $setup, $source, $projectId, false, [], $allowAlreadyInstalled);
         } finally {
             $lock->release();
         }
@@ -71,7 +77,8 @@ class MinecraftPackageInstaller
         string $source,
         string $projectId,
         bool $requiredDependency,
-        array $stack
+        array $stack,
+        bool $allowAlreadyInstalled = false
     ): MinecraftToolkitPackage {
         $packageType = match ($setup->software) {
             'paper', 'purpur', 'folia' => 'plugin',
@@ -94,7 +101,11 @@ class MinecraftPackageInstaller
             ->where('managed', true)
             ->first();
         if ($alreadyInstalled instanceof MinecraftToolkitPackage) {
-            if ($requiredDependency) {
+            if ($requiredDependency || $allowAlreadyInstalled) {
+                if ($allowAlreadyInstalled && $alreadyInstalled->getAttribute('setup_id') !== $setup->id) {
+                    $alreadyInstalled->forceFill(['setup_id' => $setup->id])->save();
+                }
+
                 return $alreadyInstalled;
             }
 
@@ -122,7 +133,7 @@ class MinecraftPackageInstaller
                     );
                 }
 
-                $this->performInstall($server, $setup, $source, $dependencyProjectId, true, $stack);
+                $this->performInstall($server, $setup, $source, $dependencyProjectId, true, $stack, $allowAlreadyInstalled);
             }
 
             $project = $candidate['project'];
@@ -130,18 +141,40 @@ class MinecraftPackageInstaller
             $file = $version['selected_file'];
             $fileName = $this->safeFileName((string) $file['filename']);
             $path = "/$targetDirectory/$fileName";
+            $hashes = is_array($file['hashes'] ?? null) ? $file['hashes'] : [];
+
+            // Wings responds with 404 when listing a directory that does not exist yet.
+            // Create the package directory before checking for a conflicting target file.
+            $this->files->makeDirectory($server, "/$targetDirectory");
 
             if ($this->files->exists($server, $path)) {
-                throw new MinecraftToolkitException("Die Datei $fileName existiert bereits im $targetDirectory-Ordner.");
-            }
+                if (! $allowAlreadyInstalled) {
+                    throw new MinecraftToolkitException("Die Datei $fileName existiert bereits im $targetDirectory-Ordner.");
+                }
 
-            $metadata = $this->files->downloadJarWithMetadata(
-                $server,
-                (string) $file['url'],
-                $path,
-                is_array($file['hashes'] ?? null) ? $file['hashes'] : []
-            );
-            $this->assertDownloadedVersionMatchesCandidate($metadata['plugin_version'] ?? null, (string) ($version['version_number'] ?? $version['name'] ?? ''));
+                // A queue interruption can happen after the verified atomic write but before
+                // the managed package row is committed. Only adopt the file when it still
+                // matches the source-provided checksum; unrelated user files remain untouched.
+                $metadata = $this->files->inspectExistingJarWithMetadata($server, $path, $hashes);
+                $this->assertDownloadedVersionMatchesCandidate(
+                    $metadata['plugin_version'] ?? null,
+                    (string) ($version['version_number'] ?? $version['name'] ?? '')
+                );
+            } else {
+                $expectedVersion = (string) ($version['version_number'] ?? $version['name'] ?? '');
+                $metadata = $this->files->downloadJarWithMetadata(
+                    $server,
+                    (string) $file['url'],
+                    $path,
+                    $hashes,
+                    function (array $downloadedMetadata) use ($expectedVersion): void {
+                        $this->assertDownloadedVersionMatchesCandidate(
+                            $downloadedMetadata['plugin_version'] ?? null,
+                            $expectedVersion
+                        );
+                    }
+                );
+            }
 
             $package = MinecraftToolkitPackage::query()->create([
                 'server_uuid' => $server->uuid,
@@ -203,22 +236,11 @@ class MinecraftPackageInstaller
             return;
         }
 
-        if ($this->versionBase($downloadedVersion) !== $this->versionBase($expectedVersion)) {
+        if (! MinecraftPackageVersionNormalizer::equivalent($downloadedVersion, $expectedVersion)) {
             throw new MinecraftToolkitException(
                 "Die heruntergeladene Datei enthält Version $downloadedVersion, erwartet wurde aber $expectedVersion. Die Installation wurde abgebrochen, weil die Quelle eine falsche/alte Datei geliefert hat."
             );
         }
-    }
-
-    private function versionBase(string $version): string
-    {
-        $version = trim($version);
-        $version = preg_replace('/^v/i', '', $version) ?? $version;
-        $version = preg_replace('/\+.*$/', '', $version) ?? $version;
-        $version = preg_replace('/-SNAPSHOT.*$/', '', $version) ?? $version;
-        $version = preg_replace('/^(?:bukkit|spigot|paper|fabric|forge|neoforge)-/i', '', $version) ?? $version;
-
-        return trim($version);
     }
 
     /**

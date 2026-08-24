@@ -388,6 +388,15 @@ class MinecraftUpdaterPage extends Page
                     ->where('package_id', $package->id)
                     ->latest('id')
                     ->first();
+                $installedAt = $package->getAttribute('installed_at');
+                $verifiedAfterInstall = MinecraftToolkitUpdateCheck::query()
+                    ->where('package_id', $package->id)
+                    ->where('status', 'verified')
+                    ->when(
+                        $installedAt instanceof \DateTimeInterface,
+                        fn ($query) => $query->where('checked_at', '>=', $installedAt)
+                    )
+                    ->exists();
 
                 return [
                     'id' => $package->id,
@@ -412,7 +421,7 @@ class MinecraftUpdaterPage extends Page
                     'system' => $package->is_system_package,
                     'pinned' => (bool) $package->update_pinned,
                     'enabled' => (bool) $package->enabled,
-                    'health' => $this->packageHealth($package, $check),
+                    'health' => $this->packageHealth($package, $check, $verifiedAfterInstall),
                     'can_install_dependencies' => $check?->status === 'error'
                         && is_string($check?->message)
                         && (str_contains($check->message, 'Pflicht-Abhängigkeiten')
@@ -444,12 +453,27 @@ class MinecraftUpdaterPage extends Page
     }
 
     /** @return array{score: int, label: string, color: string, reasons: array<int, string>} */
-    private function packageHealth(MinecraftToolkitPackage $package, ?MinecraftToolkitUpdateCheck $check): array
-    {
+    private function packageHealth(
+        MinecraftToolkitPackage $package,
+        ?MinecraftToolkitUpdateCheck $check,
+        bool $verifiedAfterInstall = false,
+    ): array {
         $score = 75;
         $reasons = [];
+        $packageMetadata = $package->getAttribute('dependencies_json');
 
-        if (in_array($package->source, ['modrinth', 'geysermc'], true)) {
+        if (in_array($package->source, [
+            'modrinth',
+            'geysermc',
+            'official',
+            'official-bedrock',
+            'paper',
+            'purpur',
+            'folia',
+            'fabric',
+            'forge',
+            'neoforge',
+        ], true)) {
             $score += 10;
             $reasons[] = trans('minecrafttoolkit::strings.updater.health_trusted_source');
         } elseif ($package->source === 'curseforge') {
@@ -460,6 +484,11 @@ class MinecraftUpdaterPage extends Page
         if (is_string($package->sha512) && $package->sha512 !== '') {
             $score += 10;
             $reasons[] = trans('minecrafttoolkit::strings.updater.health_sha512');
+        } elseif (is_array($packageMetadata)
+            && is_string($packageMetadata['sha256'] ?? null)
+            && $packageMetadata['sha256'] !== '') {
+            $score += 10;
+            $reasons[] = trans('minecrafttoolkit::strings.updater.health_sha256');
         } elseif (is_string($package->sha1) && $package->sha1 !== '') {
             $score += 3;
             $reasons[] = trans('minecrafttoolkit::strings.updater.health_sha1');
@@ -469,11 +498,10 @@ class MinecraftUpdaterPage extends Page
         }
 
         if ($package->update_pinned) {
-            $score -= 10;
             $reasons[] = trans('minecrafttoolkit::strings.updater.health_pinned');
         }
 
-        if ($check?->status === 'verified') {
+        if ($verifiedAfterInstall || $check?->status === 'verified') {
             $score += 10;
             $reasons[] = trans('minecrafttoolkit::strings.updater.health_verified');
         } elseif (in_array($check?->status, ['error', 'rollback_recommended'], true)) {
@@ -493,7 +521,7 @@ class MinecraftUpdaterPage extends Page
                 : ($score >= 60
                     ? trans('minecrafttoolkit::strings.updater.health_ok')
                     : trans('minecrafttoolkit::strings.updater.health_attention')),
-            'color' => $score >= 85 ? 'text-success-600' : ($score >= 60 ? 'text-warning-600' : 'text-danger-600'),
+            'color' => $score >= 85 ? 'success' : ($score >= 60 ? 'warning' : 'danger'),
             'reasons' => array_slice($reasons, 0, 3),
         ];
     }
